@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 1.4.0
- * Описание: Весь рендеринг экранов и обработчики действий. Восстановлен полный код (предыдущая версия была обрезана на exportCsv, отсутствовал handleBack).
+ * Версия: 1.5.0
+ * Описание: Сохранение фокуса при рендеринге. Модалки вынесены из #app в document.body.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -45,7 +45,15 @@ export function initBridgeEvents() {
 export function render() {
   const app = $('app');
   const scrollTop = window.scrollY;
+  
   if ($('csvModalBackdrop') && state.screen !== 'history') closeCsvModal();
+
+  // Сохраняем фокус и позицию курсора
+  const activeEl = document.activeElement;
+  const activeId = activeEl?.id;
+  const selStart = activeEl?.selectionStart;
+  const selEnd = activeEl?.selectionEnd;
+
   const renderKey = `${state.screen}|${state.workout?.exIdx ?? ''}`;
   let html = '';
   switch (state.screen) {
@@ -57,14 +65,38 @@ export function render() {
     case 'dayEdit': html = renderDayEdit(); break;
     default: html = renderMenu();
   }
-  if (state.pendingAdd) html += renderAddDialog();
-  if (state.newDayOpen) html += renderNewDayDialog();
+  
   app.innerHTML = html;
+
+  // Управление модалками (вынесено из #app, чтобы не ломать рефлоу)
+  document.getElementById('addDialogBackdrop')?.remove();
+  document.getElementById('newDayDialogBackdrop')?.remove();
+
+  if (state.pendingAdd) {
+    const dHtml = renderAddDialog();
+    if (dHtml) document.body.insertAdjacentHTML('beforeend', dHtml);
+  }
+  if (state.newDayOpen) {
+    document.body.insertAdjacentHTML('beforeend', renderNewDayDialog());
+  }
+
   document.body.classList.toggle('modal-open', !!state.pendingAdd || !!state.newDayOpen || !!$('csvModalBackdrop'));
+
   if (renderKey === prevRenderKey && scrollTop > 0) {
     requestAnimationFrame(() => window.scrollTo(0, scrollTop));
   }
   prevRenderKey = renderKey;
+
+  // Восстанавливаем фокус
+  if (activeId) {
+    const el = document.getElementById(activeId);
+    if (el) {
+      el.focus();
+      if (selStart !== undefined && selEnd !== undefined && el.setSelectionRange) {
+        try { el.setSelectionRange(selStart, selEnd); } catch(_) {}
+      }
+    }
+  }
 
   if (state.screen === 'workout') {
     const wIn = $('wInput'), rIn = $('rInput'), nIn = $('noteInput');
