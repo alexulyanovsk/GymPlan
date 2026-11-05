@@ -1,5 +1,5 @@
 import { loadState, saveState, importData, state } from './state.js';
-import { render, ACTIONS, renderLibraryList } from './ui.js';
+import { render, ACTIONS, renderLibraryList, initBridgeEvents } from './ui.js'; // <--- Добавлен initBridgeEvents
 import { tg } from './bridge.js';
 
 document.body.addEventListener('click', ev => {
@@ -55,6 +55,7 @@ document.addEventListener('visibilitychange', () => {
 
 (async function init() {
   await loadState();
+  initBridgeEvents(); // <--- Инициализация нативных кнопок MAX/TG
   render();
 
   if ('serviceWorker' in navigator) {
