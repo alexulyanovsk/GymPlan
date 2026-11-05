@@ -176,7 +176,7 @@ export const DEFAULT_PLANS = {
 export const DEFAULT_STATE = {
   plans: JSON.parse(JSON.stringify(DEFAULT_PLANS)),
   screen: 'menu', currentDayId: null, workout: null, weights: {}, history: [],
-  lastCompletedTs: 0,
+  lastCompletedTs: 0, _lastSavedTs: 0,
   libFilter: 'Все', libSearch: '', pendingAdd: null, newDayOpen: false, newDayName: '',
   editingDayId: null, pickForDayId: null, rest: null
 };
