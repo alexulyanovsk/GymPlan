@@ -1,3 +1,9 @@
+/**
+ * Файл: js/bridge.js
+ * Версия: 1.2.0
+ * Описание: Мост к MAX WebApp (с фолбэком на Telegram). Тема, тактильная отдача, диалоги, блокировка закрытия, попытка программного закрытия приложения.
+ */
+
 export const tg = window.WebApp || window.Telegram?.WebApp;
 export const IS_MAX = !!tg;
 
@@ -38,6 +44,27 @@ export function disableCloseConfirm() {
   if (IS_MAX && tg?.disableClosingConfirmation) {
     try { tg.disableClosingConfirmation(); } catch(_) {}
   }
+}
+
+/**
+ * Пытается программно закрыть мини-приложение (MAX / Telegram),
+ * с фолбэком на window.close() для standalone-окна.
+ * Возвращает true, если удалось инициировать закрытие.
+ */
+export function closeApp() {
+  if (IS_MAX) {
+    if (typeof tg?.close === 'function') {
+      try { tg.close(); return true; } catch(_) {}
+    }
+    if (typeof tg?.closeWebApp === 'function') {
+      try { tg.closeWebApp(); return true; } catch(_) {}
+    }
+  }
+  try {
+    window.close();
+    return true;
+  } catch(_) {}
+  return false;
 }
 
 export function applyTheme() {
