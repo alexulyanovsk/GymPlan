@@ -10,6 +10,26 @@ let prevRenderKey = '';
 let doneSetRunning = false;
 let csvExportRunning = false;
 
+export function initBridgeEvents() {
+  if (!tg) return;
+  if (tg.MainButton) {
+    tg.MainButton.onClick(() => {
+      if (state.rest) { skipRest(); return; }
+      const w = state.workout, ex = getCurrentEx();
+      if (!w || !ex) return;
+      if (w.tempSets.length >= ex.sets) advanceExercise(); else doneSet();
+    });
+  }
+  if (tg.BackButton) {
+    tg.BackButton.onClick(() => {
+      if (state.screen === 'workout') cancelWorkout();
+      else if (state.screen === 'library') exitLibrary();
+      else if (state.screen === 'dayEdit') closeDayEdit();
+      else if (state.screen !== 'menu' && state.screen !== 'complete') goMenu();
+    });
+  }
+}
+
 export function render() {
   const app = $('app');
   const scrollTop = window.scrollY;
