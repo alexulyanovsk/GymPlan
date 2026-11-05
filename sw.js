@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymplan-v1';
+const CACHE_NAME = 'gymplan-v2'; // ОБНОВЛЕНО НА v2
 const ASSETS = [
   './',
   './index.html',
@@ -31,7 +31,6 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   
-  // Кэшируем GIF с CDN (Cache First)
   if (url.hostname === 'd3d2ynhodh9o1z.cloudfront.net') {
     e.respondWith(
       caches.match(e.request).then((cached) => {
@@ -46,7 +45,6 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Для остальных (HTML, CSS, JS) - Network First с фолбэком на кэш
   e.respondWith(
     fetch(e.request).then((res) => {
       return caches.open(CACHE_NAME).then((cache) => {
