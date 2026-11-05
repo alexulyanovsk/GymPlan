@@ -26,12 +26,14 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px 0; }
 .mt-10 { margin-top: 10px; } .mt-16 { margin-top: 16px; }
 .btn-centered { max-width: 200px; margin-left: auto; margin-right: auto; }
 
-:is(.card, .quick-start, .modal, .search-input) {
+/* Оптимизация backdrop-filter: применяем только к критичным элементам, чтобы избежать лагов */
+.card, .modal, .quick-start {
   background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border);
 }
-:is(.day-btn, .lib-item, .history-item, .chip, .circle-btn, .rest-btn, .modal-day-btn, .day-edit-btn, .note-input) {
+:is(.day-btn, .lib-item, .history-item, .chip, .circle-btn, .rest-btn, .modal-day-btn, .day-edit-btn, .note-input, .search-input) {
   background: var(--glass-bg); border: 1px solid var(--glass-border);
 }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
@@ -39,7 +41,7 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px 0; }
 .btn:active { opacity: 0.75; transform: scale(0.98); }
 .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
 .btn-primary { background: var(--a); color: var(--btn-t); }
-.btn-secondary { color: var(--t); border: 1px solid var(--glass-border); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: var(--glass-bg); }
+.btn-secondary { color: var(--t); border: 1px solid var(--glass-border); background: var(--glass-bg); }
 .btn-small { padding: 10px 14px; font-size: 14px; }
 .btn-danger { background: transparent; color: var(--r); border: 1px solid rgba(255,107,107,0.4); }
 .card { padding: 16px; margin-bottom: 12px; border-radius: 12px; }
