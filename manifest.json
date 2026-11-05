@@ -1,8 +1,8 @@
 {
   "_meta": {
     "file": "manifest.json",
-    "version": "1.2.0",
-    "description": "Добавлены PNG-иконки для совместимости со старыми устройствами."
+    "version": "1.3.0",
+    "description": "Манифест PWA с обновленным цветом (OLED Black)."
   },
   "id": "/GymPlan/",
   "name": "GymPlan - Трекер тренировок",
@@ -11,8 +11,8 @@
   "start_url": "/GymPlan/",
   "scope": "/GymPlan/",
   "display": "standalone",
-  "background_color": "#0f0f11",
-  "theme_color": "#0f0f11",
+  "background_color": "#09090B",
+  "theme_color": "#09090B",
   "orientation": "portrait",
   "icons": [
     {
