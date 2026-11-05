@@ -1,17 +1,20 @@
 <!--
   GymPlan
   Файл: index.html
-  Версия: 1.4.0
-  Описание: Ужесточен CSP, вынесен аварийный сброс в boot.js.
+  Версия: 2.0.0
+  Описание: Современный дизайн 2027 (Skeleton Loader, Manrope, OLED).
 -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0f0f11">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://st.max.ru; style-src 'self' 'unsafe-inline'; img-src 'self' https://d3d2ynhodh9o1z.cloudfront.net data:; connect-src 'self'; form-action 'none'; base-uri 'self'; object-src 'none';">
+<meta name="theme-color" content="#09090B">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://st.max.ru; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://d3d2ynhodh9o1z.cloudfront.net data:; connect-src 'self'; form-action 'none'; base-uri 'self'; object-src 'none';">
 <title>GymPlan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="styles.css">
@@ -19,7 +22,12 @@
 <script src="js/boot.js"></script>
 </head>
 <body>
-<div id="app"><div class="loading">Загрузка...</div></div>
+<div id="app">
+  <div class="skeleton skeleton-title"></div>
+  <div class="skeleton skeleton-card"></div>
+  <div class="skeleton skeleton-card"></div>
+  <div class="skeleton skeleton-card"></div>
+</div>
 <input type="file" id="importFile" accept=".json" style="display:none">
 <script type="module" src="js/main.js"></script>
 </body>
