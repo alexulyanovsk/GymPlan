@@ -78,20 +78,36 @@ export function sanitizeState() {
 }
 
 export async function loadState() {
+  let savedState = null;
   try {
-    const savedState = await dbGet('full_state');
-    if (savedState) {
-      state.plans = savedState.plans || state.plans;
-      state.screen = savedState.screen || state.screen;
-      state.currentDayId = savedState.currentDayId || null;
-      state.workout = savedState.workout || null;
-      state.history = savedState.history || [];
-      state.weights = savedState.weights || {};
-      state.lastCompletedTs = savedState.lastCompletedTs || 0;
-    }
+    savedState = await dbGet('full_state');
   } catch (e) {
     console.warn("DB Load error", e);
   }
+
+  let emergencyState = null;
+  try {
+    const emStr = localStorage.getItem('gymplan_emergency');
+    if (emStr) {
+      const parsed = JSON.parse(emStr);
+      if (!savedState || (parsed._lastSavedTs && parsed._lastSavedTs > (savedState._lastSavedTs || 0))) {
+         emergencyState = parsed;
+      }
+    }
+  } catch(_) {}
+
+  const source = emergencyState || savedState;
+  if (source) {
+    state.plans = source.plans || state.plans;
+    state.screen = source.screen || state.screen;
+    state.currentDayId = source.currentDayId || null;
+    state.workout = source.workout || null;
+    state.history = source.history || [];
+    state.weights = source.weights || {};
+    state.lastCompletedTs = source.lastCompletedTs || 0;
+    state._lastSavedTs = source._lastSavedTs || 0;
+  }
+
   sanitizeState();
   try {
     const restStr = localStorage.getItem('gym_rest_v5');
@@ -102,8 +118,9 @@ export async function loadState() {
   } catch(_) {}
 }
 
-async function flushNow() {
+export async function flushNow() {
   try {
+    state._lastSavedTs = Date.now();
     const stateToSave = JSON.parse(JSON.stringify({
       plans: state.plans,
       screen: state.screen,
@@ -111,10 +128,14 @@ async function flushNow() {
       workout: state.workout,
       history: state.history,
       weights: state.weights,
-      lastCompletedTs: state.lastCompletedTs
+      lastCompletedTs: state.lastCompletedTs,
+      _lastSavedTs: state._lastSavedTs
     }));
     await dbSet('full_state', stateToSave);
     
+    // Очищаем аварийный слепок, так как успешно сохранились в БД
+    localStorage.removeItem('gymplan_emergency');
+
     if (state.rest) localStorage.setItem('gym_rest_v5', JSON.stringify(state.rest));
     else localStorage.removeItem('gym_rest_v5');
 
@@ -134,7 +155,7 @@ export function saveState() {
 }
 
 export async function exportData() {
-  const data = (await dbGet('full_state')) || {}; // <--- ФИКС: fallback, если база пуста
+  const data = (await dbGet('full_state')) || {};
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -150,7 +171,7 @@ export async function importData(file) {
     reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid data'); // <--- ФИКС: проверка структуры
+        if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid data');
         await dbSet('full_state', data);
         await loadState();
         resolve();
