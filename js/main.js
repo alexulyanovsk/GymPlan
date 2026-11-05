@@ -1,14 +1,15 @@
 /**
  * Файл: js/main.js
- * Версия: 1.2.2
- * Описание: Точка входа. Убран пустой URL из history.replaceState, добавлен перехват ошибок инициализации.
+ * Версия: 1.3.0
+ * Описание: Точка входа. Немедленный рендер до загрузки БД, чтобы избежать вечной загрузки. Обработка системной кнопки «Назад» Android.
  */
 
 import { loadState, saveState, importData, state } from './state.js';
 import { render, ACTIONS, renderLibraryList, initBridgeEvents, handleBack } from './ui.js';
 import { uiConfirm, uiAlert, closeApp } from './bridge.js';
 
-// Показываем ошибку на экране, если что-то упало до рендера
+window.__GYMPLAN_LOADED = true;
+
 function showFatalError(err) {
   console.error('[GymPlan Fatal]', err);
   const app = document.getElementById('app');
@@ -76,12 +77,9 @@ const DOUBLE_BACK_MS = 2000;
 
 function setupBackHandler() {
   try {
-    // Без третьего аргумента (URL) — так безопаснее для WebView
     history.replaceState({ gymplan: true }, '');
     history.pushState({ gymplan: true }, '');
-  } catch(e) {
-    console.warn('History API недоступен:', e);
-  }
+  } catch(e) { console.warn('History API недоступен:', e); }
 
   window.addEventListener('popstate', async () => {
     if (handleBack()) {
@@ -94,9 +92,7 @@ function setupBackHandler() {
     const now = Date.now();
     if (now - lastBackPress < DOUBLE_BACK_MS) {
       const closed = closeApp();
-      if (!closed) {
-        uiAlert('Закройте приложение через меню устройства');
-      }
+      if (!closed) uiAlert('Закройте приложение через меню устройства');
       return;
     }
     lastBackPress = now;
@@ -104,9 +100,7 @@ function setupBackHandler() {
     const ok = await uiConfirm('Выйти из GymPlan?');
     if (ok) {
       const closed = closeApp();
-      if (!closed) {
-        uiAlert('Закройте приложение через меню устройства');
-      }
+      if (!closed) uiAlert('Закройте приложение через меню устройства');
     }
   });
 }
@@ -147,10 +141,23 @@ function setupServiceWorkerUpdates() {
 
 (async function init() {
   try {
-    await loadState();
+    // 1. Инициализируем кнопки и историю
     initBridgeEvents();
     setupBackHandler();
+
+    // 2. Рендерим СРАЗУ с дефолтным стейтом (экран уже не пустой)
     render();
+
+    // 3. Пытаемся загрузить БД, но максимум ждём 2.5 секунды
+    await Promise.race([
+      loadState(),
+      new Promise(resolve => setTimeout(resolve, 2500))
+    ]);
+
+    // 4. Перерисовываем с реальными данными
+    render();
+
+    // 5. Регистрируем SW
     setupServiceWorkerUpdates();
   } catch (err) {
     showFatalError(err);
