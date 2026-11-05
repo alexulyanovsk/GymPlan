@@ -1,12 +1,30 @@
 /**
  * Файл: sw.js
- * Версия: 3.0.0 (Кэширует ТОЛЬКО картинки. HTML и JS всегда грузятся из сети)
+ * Версия: 4.0.0 (Полноценный офлайн-режим: Network-First для HTML, Stale-While-Revalidate для JS/CSS)
  */
 
-const CACHE_NAME = 'gymplan-images-v1';
+const CACHE_NAME = 'gymplan-v3';
+const APP_SHELL = [
+  '/GymPlan/',
+  '/GymPlan/index.html',
+  '/GymPlan/styles.css',
+  '/GymPlan/manifest.json',
+  '/GymPlan/icon.svg',
+  '/GymPlan/js/boot.js',
+  '/GymPlan/js/main.js',
+  '/GymPlan/js/ui.js',
+  '/GymPlan/js/state.js',
+  '/GymPlan/js/data.js',
+  '/GymPlan/js/db.js',
+  '/GymPlan/js/bridge.js',
+  '/GymPlan/js/utils.js'
+];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -20,7 +38,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
-  // Кэшируем ТОЛЬКО картинки с CDN (они не меняются, экономим трафик)
+  // 1. Картинки с CDN — Cache First
   if (url.hostname === 'd3d2ynhodh9o1z.cloudfront.net') {
     e.respondWith(
       caches.match(e.request).then((cached) => {
@@ -35,6 +53,32 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Для HTML, JS, CSS и остального — НЕ ВМЕШИВАЕМСЯ.
-  // Браузер сам скачает свежие файлы с GitHub.
+  // 2. Навигация (HTML) — Network First, fallback to Cache
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match('/GymPlan/index.html') || caches.match('/GymPlan/'))
+    );
+    return;
+  }
+
+  // 3. Локальная статика (JS, CSS) — Stale-While-Revalidate
+  if (url.pathname.startsWith('/GymPlan/') && (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'))) {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        const fetchPromise = fetch(e.request).then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          return res;
+        }).catch(() => cached);
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
 });
