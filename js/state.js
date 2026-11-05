@@ -134,7 +134,7 @@ export function saveState() {
 }
 
 export async function exportData() {
-  const data = await dbGet('full_state');
+  const data = (await dbGet('full_state')) || {}; // <--- ФИКС: fallback, если база пуста
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -150,6 +150,7 @@ export async function importData(file) {
     reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
+        if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid data'); // <--- ФИКС: проверка структуры
         await dbSet('full_state', data);
         await loadState();
         resolve();
