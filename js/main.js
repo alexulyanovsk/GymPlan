@@ -1,10 +1,10 @@
 /**
  * Файл: js/main.js
- * Версия: 1.3.0
- * Описание: Точка входа. Немедленный рендер до загрузки БД, чтобы избежать вечной загрузки. Обработка системной кнопки «Назад» Android.
+ * Версия: 1.4.0
+ * Описание: Добавлено аварийное сохранение при закрытии и защита от потери данных.
  */
 
-import { loadState, saveState, importData, state } from './state.js';
+import { loadState, saveState, flushNow, importData, state } from './state.js';
 import { render, ACTIONS, renderLibraryList, initBridgeEvents, handleBack } from './ui.js';
 import { uiConfirm, uiAlert, closeApp } from './bridge.js';
 
@@ -67,9 +67,23 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
   e.target.value = '';
 });
 
-window.addEventListener('beforeunload', () => { saveState(); });
+// Аварийное сохранение
+function emergencySave() {
+  try {
+    const ts = Date.now();
+    state._lastSavedTs = ts;
+    localStorage.setItem('gymplan_emergency', JSON.stringify({
+      plans: state.plans, screen: state.screen, currentDayId: state.currentDayId,
+      workout: state.workout, history: state.history, weights: state.weights,
+      lastCompletedTs: state.lastCompletedTs, _lastSavedTs: ts
+    }));
+  } catch(_) {}
+}
+
+window.addEventListener('beforeunload', () => { emergencySave(); flushNow(); });
+window.addEventListener('pagehide', () => { emergencySave(); flushNow(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') saveState();
+  if (document.visibilityState === 'hidden') { emergencySave(); flushNow(); }
 });
 
 let lastBackPress = 0;
@@ -141,23 +155,16 @@ function setupServiceWorkerUpdates() {
 
 (async function init() {
   try {
-    // 1. Инициализируем кнопки и историю
     initBridgeEvents();
     setupBackHandler();
-
-    // 2. Рендерим СРАЗУ с дефолтным стейтом (экран уже не пустой)
     render();
 
-    // 3. Пытаемся загрузить БД, но максимум ждём 2.5 секунды
     await Promise.race([
       loadState(),
       new Promise(resolve => setTimeout(resolve, 2500))
     ]);
 
-    // 4. Перерисовываем с реальными данными
     render();
-
-    // 5. Регистрируем SW
     setupServiceWorkerUpdates();
   } catch (err) {
     showFatalError(err);
