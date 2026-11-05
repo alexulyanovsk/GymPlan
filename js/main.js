@@ -1,6 +1,12 @@
+/**
+ * Файл: js/main.js
+ * Версия: 1.2.0
+ * Описание: Точка входа. Инициализация, глобальные слушатели, обработка системной кнопки «Назад» Android через history API с подтверждением выхода и защитой от случайного закрытия.
+ */
+
 import { loadState, saveState, importData, state } from './state.js';
-import { render, ACTIONS, renderLibraryList, initBridgeEvents } from './ui.js'; // <--- Добавлен initBridgeEvents
-import { tg } from './bridge.js';
+import { render, ACTIONS, renderLibraryList, initBridgeEvents, handleBack } from './ui.js';
+import { uiConfirm, uiAlert, closeApp } from './bridge.js';
 
 document.body.addEventListener('click', ev => {
   if (ev.target.id === 'addDialogBackdrop') { ACTIONS.closeAddDialog(); return; }
@@ -53,16 +59,90 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveState();
 });
 
+/**
+ * Обработка системной кнопки «Назад» на Android.
+ * - Внутри экранов: возврат на шаг назад (перехватываем событие).
+ * - На главном экране: спрашиваем «Выйти?».
+ * - Двойное нажатие за 2 сек: выход без вопросов (как в Telegram).
+ */
+let lastBackPress = 0;
+const DOUBLE_BACK_MS = 2000;
+
+function setupBackHandler() {
+  history.replaceState({ gymplan: true }, '', '');
+  history.pushState({ gymplan: true }, '', '');
+
+  window.addEventListener('popstate', async () => {
+    // 1) Внутри приложения — обрабатываем шаг назад и восстанавливаем буфер
+    if (handleBack()) {
+      history.pushState({ gymplan: true }, '', '');
+      return;
+    }
+
+    // 2) Главный экран — сначала восстанавливаем буфер, чтобы не вылететь случайно
+    history.pushState({ gymplan: true }, '', '');
+
+    // 3) Двойное нажатие — выход без вопросов
+    const now = Date.now();
+    if (now - lastBackPress < DOUBLE_BACK_MS) {
+      const closed = closeApp();
+      if (!closed) {
+        uiAlert('Закройте приложение через меню устройства');
+      }
+      return;
+    }
+    lastBackPress = now;
+
+    // 4) Одиночное нажатие — спрашиваем подтверждение
+    const ok = await uiConfirm('Выйти из GymPlan?');
+    if (ok) {
+      const closed = closeApp();
+      if (!closed) {
+        uiAlert('Закройте приложение через меню устройства');
+      }
+    }
+    // Если «Нет» — остаёмся, буфер уже восстановлен
+  });
+}
+
+let swReloading = false;
+function setupServiceWorkerUpdates() {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then(reg => {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          reg.update().catch(() => {});
+        }
+      });
+      setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000);
+    })
+    .catch(err => console.log('SW registration failed: ', err));
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swReloading) return;
+    swReloading = true;
+    if (state.screen === 'workout' || state.rest) {
+      console.log('[SW] Обновление готово. Применится после завершения тренировки.');
+      return;
+    }
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'SW_UPDATED' && state.screen !== 'workout' && !state.rest) {
+      if (swReloading) return;
+      swReloading = true;
+      window.location.reload();
+    }
+  });
+}
+
 (async function init() {
   await loadState();
-  initBridgeEvents(); // <--- Инициализация нативных кнопок MAX/TG
+  initBridgeEvents();
+  setupBackHandler();
   render();
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => {
-        console.log('SW registration failed: ', err);
-      });
-    });
-  }
+  setupServiceWorkerUpdates();
 })();
