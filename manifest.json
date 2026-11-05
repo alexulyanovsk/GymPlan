@@ -1,8 +1,8 @@
 {
   "_meta": {
     "file": "manifest.json",
-    "version": "1.1.0",
-    "description": "Манифест PWA. Явный id/start_url/scope изолируют приложение от других проектов на alexulyanovsk.github.io."
+    "version": "1.2.0",
+    "description": "Добавлены PNG-иконки для совместимости со старыми устройствами."
   },
   "id": "/GymPlan/",
   "name": "GymPlan - Трекер тренировок",
@@ -15,6 +15,18 @@
   "theme_color": "#0f0f11",
   "orientation": "portrait",
   "icons": [
+    {
+      "src": "/GymPlan/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/GymPlan/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/GymPlan/icon.svg",
       "sizes": "192x192 512x512",
