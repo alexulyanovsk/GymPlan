@@ -1,7 +1,7 @@
 /**
  * Файл: js/db.js
- * Версия: 1.1.0
- * Описание: Обёртка над IndexedDB с защитой от зависаний. Если база не открывается или чтение занимает больше 3 секунд — промис реджектится, приложение использует дефолтный стейт.
+ * Версия: 1.2.0
+ * Описание: Добавлены таймауты для предотвращения зависания IndexedDB.
  */
 
 const DB_NAME = 'GymPlanDB';
@@ -31,22 +31,31 @@ function getDB() {
   return dbPromise;
 }
 
+function withTimeout(promise, ms = 3000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('DB timeout')), ms))
+  ]);
+}
+
 export async function dbSet(key, value) {
   const db = await getDB();
-  return new Promise((resolve, reject) => {
+  const p = new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put(value, key);
     tx.oncomplete = () => resolve();
     tx.onerror = e => reject(e.target.error);
   });
+  return withTimeout(p);
 }
 
 export async function dbGet(key) {
   const db = await getDB();
-  return new Promise((resolve, reject) => {
+  const p = new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).get(key);
     req.onsuccess = () => resolve(req.result);
     req.onerror = e => reject(e.target.error);
   });
+  return withTimeout(p);
 }
