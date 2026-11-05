@@ -1,3 +1,9 @@
+/**
+ * Файл: js/ui.js
+ * Версия: 1.4.0
+ * Описание: Весь рендеринг экранов и обработчики действий. Восстановлен полный код (предыдущая версия была обрезана на exportCsv, отсутствовал handleBack).
+ */
+
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
 import { M, EX_ENTRIES, EXERCISES, LIMITS } from './data.js';
 import { $, e, fn, pn, rs, ws, fd } from './utils.js';
@@ -10,6 +16,17 @@ let prevRenderKey = '';
 let doneSetRunning = false;
 let csvExportRunning = false;
 
+export function handleBack() {
+  if (state.pendingAdd) { closeAddDialog(); return true; }
+  if (state.newDayOpen) { closeNewDay(); return true; }
+  if (state.screen === 'workout') { cancelWorkout(); return true; }
+  if (state.screen === 'complete') { goMenu(); return true; }
+  if (state.screen === 'dayEdit') { closeDayEdit(); return true; }
+  if (state.screen === 'library') { exitLibrary(); return true; }
+  if (state.screen === 'history') { goMenu(); return true; }
+  return false;
+}
+
 export function initBridgeEvents() {
   if (!tg) return;
   if (tg.MainButton) {
@@ -21,12 +38,7 @@ export function initBridgeEvents() {
     });
   }
   if (tg.BackButton) {
-    tg.BackButton.onClick(() => {
-      if (state.screen === 'workout') cancelWorkout();
-      else if (state.screen === 'library') exitLibrary();
-      else if (state.screen === 'dayEdit') closeDayEdit();
-      else if (state.screen !== 'menu' && state.screen !== 'complete') goMenu();
-    });
+    tg.BackButton.onClick(() => { handleBack(); });
   }
 }
 
@@ -53,7 +65,7 @@ export function render() {
     requestAnimationFrame(() => window.scrollTo(0, scrollTop));
   }
   prevRenderKey = renderKey;
-  
+
   if (state.screen === 'workout') {
     const wIn = $('wInput'), rIn = $('rInput'), nIn = $('noteInput');
     if (wIn) {
@@ -365,7 +377,7 @@ async function doneSet() {
     const reps = rI ? pn(rI.value) : w.currentReps;
     if (!isBW && (!isFinite(weight) || weight < 0)) { uiAlert('Введите корректный вес'); return; }
     if (!isFinite(reps) || reps < 1) { uiAlert('Введите корректное число повторов'); return; }
-    
+
     if (nI) w.currentNote = nI.value;
     w.currentWeight = weight; w.currentReps = reps;
     w.tempSets.push({ weight, reps });
