@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymplan-v6'; // <--- ОБЯЗАТЕЛЬНО сменить на v6!
+const CACHE_NAME = 'gymplan-v8'; // <--- ОБЯЗАТЕЛЬНО сменить на v6!
 const ASSETS = [
   './',
   './index.html',
