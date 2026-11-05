@@ -1,12 +1,24 @@
 /**
  * Файл: js/main.js
- * Версия: 1.2.0
- * Описание: Точка входа. Инициализация, глобальные слушатели, обработка системной кнопки «Назад» Android через history API с подтверждением выхода и защитой от случайного закрытия.
+ * Версия: 1.2.2
+ * Описание: Точка входа. Убран пустой URL из history.replaceState, добавлен перехват ошибок инициализации.
  */
 
 import { loadState, saveState, importData, state } from './state.js';
 import { render, ACTIONS, renderLibraryList, initBridgeEvents, handleBack } from './ui.js';
 import { uiConfirm, uiAlert, closeApp } from './bridge.js';
+
+// Показываем ошибку на экране, если что-то упало до рендера
+function showFatalError(err) {
+  console.error('[GymPlan Fatal]', err);
+  const app = document.getElementById('app');
+  if (app && app.innerHTML.includes('Загрузка')) {
+    app.innerHTML = `<div style="padding:20px;color:#FF6B6B;font-family:monospace;font-size:12px;white-space:pre-wrap;">Ошибка запуска:\n${err?.message || err}\n\n${err?.stack || ''}</div>`;
+  }
+}
+
+window.addEventListener('error', e => showFatalError(e.error));
+window.addEventListener('unhandledrejection', e => showFatalError(e.reason));
 
 document.body.addEventListener('click', ev => {
   if (ev.target.id === 'addDialogBackdrop') { ACTIONS.closeAddDialog(); return; }
@@ -59,30 +71,26 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveState();
 });
 
-/**
- * Обработка системной кнопки «Назад» на Android.
- * - Внутри экранов: возврат на шаг назад (перехватываем событие).
- * - На главном экране: спрашиваем «Выйти?».
- * - Двойное нажатие за 2 сек: выход без вопросов (как в Telegram).
- */
 let lastBackPress = 0;
 const DOUBLE_BACK_MS = 2000;
 
 function setupBackHandler() {
-  history.replaceState({ gymplan: true }, '', '');
-  history.pushState({ gymplan: true }, '', '');
+  try {
+    // Без третьего аргумента (URL) — так безопаснее для WebView
+    history.replaceState({ gymplan: true }, '');
+    history.pushState({ gymplan: true }, '');
+  } catch(e) {
+    console.warn('History API недоступен:', e);
+  }
 
   window.addEventListener('popstate', async () => {
-    // 1) Внутри приложения — обрабатываем шаг назад и восстанавливаем буфер
     if (handleBack()) {
-      history.pushState({ gymplan: true }, '', '');
+      try { history.pushState({ gymplan: true }, ''); } catch(_) {}
       return;
     }
 
-    // 2) Главный экран — сначала восстанавливаем буфер, чтобы не вылететь случайно
-    history.pushState({ gymplan: true }, '', '');
+    try { history.pushState({ gymplan: true }, ''); } catch(_) {}
 
-    // 3) Двойное нажатие — выход без вопросов
     const now = Date.now();
     if (now - lastBackPress < DOUBLE_BACK_MS) {
       const closed = closeApp();
@@ -93,7 +101,6 @@ function setupBackHandler() {
     }
     lastBackPress = now;
 
-    // 4) Одиночное нажатие — спрашиваем подтверждение
     const ok = await uiConfirm('Выйти из GymPlan?');
     if (ok) {
       const closed = closeApp();
@@ -101,7 +108,6 @@ function setupBackHandler() {
         uiAlert('Закройте приложение через меню устройства');
       }
     }
-    // Если «Нет» — остаёмся, буфер уже восстановлен
   });
 }
 
@@ -140,9 +146,13 @@ function setupServiceWorkerUpdates() {
 }
 
 (async function init() {
-  await loadState();
-  initBridgeEvents();
-  setupBackHandler();
-  render();
-  setupServiceWorkerUpdates();
+  try {
+    await loadState();
+    initBridgeEvents();
+    setupBackHandler();
+    render();
+    setupServiceWorkerUpdates();
+  } catch (err) {
+    showFatalError(err);
+  }
 })();
