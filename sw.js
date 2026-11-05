@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gymplan-v5'; // ОБНОВЛЕНО НА v5
+const CACHE_NAME = 'gymplan-v6'; // ОБНОВЛЕНО НА v6
 const ASSETS = [
   './',
   './index.html',
