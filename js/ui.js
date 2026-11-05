@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 1.5.0
- * Описание: Сохранение фокуса при рендеринге. Модалки вынесены из #app в document.body.
+ * Версия: 2.0.0
+ * Описание: Современный рендеринг (Bento Grid, SVG-иконки, крупная типографика).
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -15,6 +15,23 @@ let lastSyncKey = '';
 let prevRenderKey = '';
 let doneSetRunning = false;
 let csvExportRunning = false;
+
+// --- SVG Иконки (Lucide Style) ---
+const ICON = {
+  play: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
+  book: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
+  chart: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`,
+  plus: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
+  upload: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
+  download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+  edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
+  x: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+  arrowRight: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>`,
+  arrowUp: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>`,
+  arrowDown: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>`,
+  trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+  check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+};
 
 export function handleBack() {
   if (state.pendingAdd) { closeAddDialog(); return true; }
@@ -48,7 +65,6 @@ export function render() {
   
   if ($('csvModalBackdrop') && state.screen !== 'history') closeCsvModal();
 
-  // Сохраняем фокус и позицию курсора
   const activeEl = document.activeElement;
   const activeId = activeEl?.id;
   const selStart = activeEl?.selectionStart;
@@ -68,7 +84,6 @@ export function render() {
   
   app.innerHTML = html;
 
-  // Управление модалками (вынесено из #app, чтобы не ломать рефлоу)
   document.getElementById('addDialogBackdrop')?.remove();
   document.getElementById('newDayDialogBackdrop')?.remove();
 
@@ -87,7 +102,6 @@ export function render() {
   }
   prevRenderKey = renderKey;
 
-  // Восстанавливаем фокус
   if (activeId) {
     const el = document.getElementById(activeId);
     if (el) {
@@ -138,8 +152,8 @@ function syncTelegramUI() {
   if (state.screen === 'workout') {
     if (tg.MainButton) {
       if (restActive) tg.MainButton.setText('⏭ ПРОПУСТИТЬ ОТДЫХ');
-      else if (allDone) tg.MainButton.setText(isLastEx ? '✓ ЗАВЕРШИТЬ' : '→ СЛЕДУЮЩЕЕ');
-      else tg.MainButton.setText('✓ ПОДХОД');
+      else if (allDone) tg.MainButton.setText(isLastEx ? 'ЗАВЕРШИТЬ' : 'СЛЕДУЮЩЕЕ');
+      else tg.MainButton.setText('СДЕЛАНО');
       tg.MainButton.show();
     }
     if (tg.BackButton) tg.BackButton.show();
@@ -149,41 +163,66 @@ function syncTelegramUI() {
   }
 }
 
+// --- ЭКРАНЫ ---
+
 function renderMenu() {
-  let days = '';
-  Object.entries(state.plans).forEach(([id, d]) => {
+  let daysHtml = '';
+  Object.entries(state.plans).forEach(([id, d], idx) => {
     const c = d.exercises.length; const s = c === 1 ? 'упражнение' : c < 5 ? 'упражнения' : 'упражнений';
-    days += `<div class="day-row">
-      <button class="day-btn" data-action="beginWorkout" data-id="${e(id)}">${e(d.title)}<span class="day-sub">${c} ${s}</span></button>
-      <button class="day-edit-btn" data-action="editDay" data-id="${e(id)}" aria-label="Редактировать день">✎</button>
-    </div>`;
+    daysHtml += `<button class="bento-card" data-action="beginWorkout" data-id="${e(id)}">
+      <div class="bento-day-num">0${idx + 1}</div>
+      <div>
+        <div class="bento-title">${e(d.title.split('·')[1]?.trim() || d.title)}</div>
+        <div class="bento-sub">${c} ${s}</div>
+      </div>
+    </button>`;
   });
+
   const canResume = state.workout && state.plans[state.workout.dayId];
-  const resumeBtn = canResume ? `<button class="quick-start" data-action="resumeWorkout">
-      <span class="qs-label">▶ Продолжить тренировку</span>
-      <span>${e(state.plans[state.workout.dayId].title)}</span>
-      <span class="qs-sub">Упражнение ${state.workout.exIdx + 1} из ${state.plans[state.workout.dayId].exercises.length}</span>
+  const resumeBtn = canResume ? `<button class="bento-card full-width quick-start" data-action="resumeWorkout">
+      <div style="color:var(--accent);">${ICON.play}</div>
+      <div>
+        <div class="bento-title">Продолжить тренировку</div>
+        <div class="bento-sub">${e(state.plans[state.workout.dayId].title)} · Упр. ${state.workout.exIdx + 1} из ${state.plans[state.workout.dayId].exercises.length}</div>
+      </div>
     </button>` : '';
+
   const lastDay = state.currentDayId ? state.plans[state.currentDayId] : null;
   const qs = !canResume && lastDay
-    ? `<button class="quick-start" data-action="beginWorkout" data-id="${e(state.currentDayId)}"><span class="qs-label">▶ Быстрый старт</span><span>${e(lastDay.title)}</span><span class="qs-sub">${lastDay.exercises.length} упражнений</span></button>` : '';
-  return `<h1>GymPlan</h1><p class="dim small" style="margin-bottom:20px">Сплит Push/Pull · без осевой нагрузки</p>${resumeBtn}${qs}${days || '<div class="empty">Нет дней.</div>'}<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
-  <button class="btn btn-secondary" data-action="openLibrary">📚 Библиотека</button>
-  <button class="btn btn-secondary" data-action="openHistory">📊 История</button>
-  <button class="btn btn-secondary" data-action="openNewDay">➕ Новый день</button>
-  <div style="display:flex;gap:8px;">
-    <button class="btn btn-secondary btn-small" data-action="exportData" style="flex:1">📤 Экспорт</button>
-    <button class="btn btn-secondary btn-small" data-action="importData" style="flex:1">📥 Импорт</button>
-  </div>
-  </div>`;
+    ? `<button class="bento-card full-width quick-start" data-action="beginWorkout" data-id="${e(state.currentDayId)}">
+        <div style="color:var(--accent);">${ICON.play}</div>
+        <div>
+          <div class="bento-title">Быстрый старт</div>
+          <div class="bento-sub">${e(lastDay.title)}</div>
+        </div>
+      </button>` : '';
+
+  return `
+    <h1>GymPlan</h1>
+    <p class="dim small" style="margin-bottom:24px; font-weight:500;">Сплит Push/Pull</p>
+    ${resumeBtn}
+    ${qs}
+    <div class="bento-grid">${daysHtml}</div>
+    
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:32px;">
+      <button class="btn btn-secondary" data-action="openLibrary">${ICON.book} Библиотека</button>
+      <button class="btn btn-secondary" data-action="openHistory">${ICON.chart} История</button>
+      <button class="btn btn-secondary" data-action="openNewDay">${ICON.plus} Новый день</button>
+      
+      <div style="display:flex; gap:12px; margin-top:8px;">
+        <button class="btn btn-secondary btn-small" data-action="exportData" style="flex:1">${ICON.upload} Экспорт</button>
+        <button class="btn btn-secondary btn-small" data-action="importData" style="flex:1">${ICON.download} Импорт</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderWorkout() {
   const w = state.workout; if (!w) return '<div class="empty">Ошибка: тренировка не начата</div>';
   const day = state.plans[w.dayId];
-  if (!day) return `<div class="top-bar"><h1>Ошибка</h1><button class="close-btn" data-action="goMenu" aria-label="В меню">✕</button></div><div class="empty">День не найден.<br><button class="btn btn-primary btn-small btn-centered mt-16" data-action="goMenu">В меню</button></div>`;
+  if (!day) return `<div class="top-bar"><h1>Ошибка</h1><button class="close-btn" data-action="goMenu">${ICON.x}</button></div><div class="empty">День не найден.<br><button class="btn btn-primary btn-small btn-centered mt-16" data-action="goMenu">В меню</button></div>`;
   const exId = day.exercises[w.exIdx];
-  if (!exId) return `<div class="top-bar"><h1>Ошибка</h1><button class="close-btn" data-action="goMenu" aria-label="В меню">✕</button></div><div class="empty">Упражнение не найдено.</div>`;
+  if (!exId) return `<div class="top-bar"><h1>Ошибка</h1><button class="close-btn" data-action="goMenu">${ICON.x}</button></div><div class="empty">Упражнение не найдено.</div>`;
   const ex = EXERCISES[exId]; if (!ex) return `<div class="empty">Данные упражнения не найдены.</div>`;
   const isBW = ex.unit === 'свой вес';
   const wVal = Number.isFinite(w.currentWeight) ? w.currentWeight : 0;
@@ -193,11 +232,55 @@ function renderWorkout() {
   const lastBlock = last && last.length > 0 ? `<div class="last-block">Прошлый раз: ${e(last.map(s => isBW ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', '))}</div>` : '';
   const hintBlock = prog ? `<div class="hint-block">${prog}</div>` : '';
   const gifHtml = ex.gif ? `<div class="gif-block"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"><div class="gif-placeholder">🏋️</div></div>` : `<div class="gif-block no-gif"><div class="gif-placeholder">🏋️</div></div>`;
-  const weightCtrls = isBW ? '' : `<div class="controls-row"><button class="circle-btn" data-action="decW" aria-label="Уменьшить вес">−${fn(ex.inc)}</button><div class="value-display"><input type="number" class="value-input" id="wInput" value="${wVal}" step="${ex.inc}" inputmode="decimal" autocomplete="off" aria-label="Вес"><div class="value-label">${e(ex.unit)}</div></div><button class="circle-btn" data-action="incW" aria-label="Увеличить вес">+${fn(ex.inc)}</button></div>`;
+  
+  const weightCtrls = isBW ? '' : `
+    <div class="controls-row">
+      <button class="circle-btn" data-action="decW">−</button>
+      <div class="value-display">
+        <input type="number" class="value-input" id="wInput" value="${wVal}" step="${ex.inc}" inputmode="decimal" autocomplete="off" aria-label="Вес">
+        <div class="value-label">${e(ex.unit)}</div>
+      </div>
+      <button class="circle-btn" data-action="incW">+</button>
+    </div>`;
+
   const primaryAction = allDone ? 'advanceExercise' : 'doneSet';
-  const primaryLabel = allDone ? `→ Следующее упражнение${extra > 0 ? ` (${w.tempSets.length} подходов)` : ''}` : '✓ Подход выполнен';
+  const primaryLabel = allDone ? `Следующее упражнение${extra > 0 ? ` (${w.tempSets.length})` : ''}` : 'Подход выполнен';
   const extraBtn = allDone ? `<button class="btn btn-secondary btn-small mt-10" data-action="doneSet">+ Ещё подход</button>` : '';
-  return `<div class="top-bar"><div><div class="progress-label">Упражнение ${w.exIdx + 1} из ${day.exercises.length}</div><div class="ex-title">${e(ex.name)}</div><div class="ex-meta">${ex.sets} × ${rs(ex)} · старт: ${e(ws(ex))}</div></div><button class="close-btn" data-action="cancelWorkout" title="Выйти в меню" aria-label="Выйти в меню">✕</button></div>${gifHtml}<div class="note-block">${e(ex.note)}</div>${hintBlock}${lastBlock}<div class="set-counter">Подход ${w.tempSets.length + 1}${allDone ? ` (сверх плана: ${extra + 1})` : ` из ${ex.sets}`}</div>${weightCtrls}<div class="controls-row"><button class="circle-btn" data-action="decR" aria-label="Уменьшить повторы">−</button><div class="value-display"><input type="number" class="value-input" id="rInput" value="${rVal}" step="${isBW ? 5 : 1}" inputmode="numeric" autocomplete="off" aria-label="Повторы"><div class="value-label">${isBW ? 'сек' : 'повт.'}</div></div><button class="circle-btn" data-action="incR" aria-label="Увеличить повторы">+</button></div><textarea class="note-input" id="noteInput" maxlength="500" placeholder="Заметка к упражнению">${e(w.currentNote || '')}</textarea><button class="btn btn-primary mt-16" data-action="${primaryAction}">${primaryLabel}</button>${extraBtn}<button class="btn btn-secondary btn-small mt-10" data-action="skipExercise">Пропустить упражнение →</button>`;
+
+  return `
+    <div class="top-bar">
+      <div>
+        <div class="progress-label">Упражнение ${w.exIdx + 1} из ${day.exercises.length}</div>
+        <div class="ex-title">${e(ex.name)}</div>
+        <div class="ex-meta">${ex.sets} × ${rs(ex)} · старт: ${e(ws(ex))}</div>
+      </div>
+      <button class="close-btn" data-action="cancelWorkout" aria-label="Выйти">${ICON.x}</button>
+    </div>
+    
+    ${gifHtml}
+    <div class="note-block">${e(ex.note)}</div>
+    ${hintBlock}
+    ${lastBlock}
+    
+    <div class="set-counter">Подход ${w.tempSets.length + 1}${allDone ? ` (сверх плана: ${extra + 1})` : ` из ${ex.sets}`}</div>
+    
+    ${weightCtrls}
+    
+    <div class="controls-row">
+      <button class="circle-btn" data-action="decR">−</button>
+      <div class="value-display">
+        <input type="number" class="value-input" id="rInput" value="${rVal}" step="${isBW ? 5 : 1}" inputmode="numeric" autocomplete="off" aria-label="Повторы">
+        <div class="value-label">${isBW ? 'сек' : 'повт.'}</div>
+      </div>
+      <button class="circle-btn" data-action="incR">+</button>
+    </div>
+    
+    <textarea class="note-input" id="noteInput" maxlength="500" placeholder="Заметка к упражнению...">${e(w.currentNote || '')}</textarea>
+    
+    <button class="btn btn-primary" data-action="${primaryAction}">${primaryLabel}</button>
+    ${extraBtn}
+    <button class="btn btn-secondary btn-small mt-10" data-action="skipExercise">Пропустить упражнение</button>
+  `;
 }
 
 function renderComplete() {
@@ -213,10 +296,25 @@ function renderComplete() {
     const ex = EXERCISES[r.id]; if (!ex) return;
     const isBW = ex.unit === 'свой вес';
     const setsTxt = r.sets.map(s => isBW ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', ');
-    summary += `<div class="mt-10" style="margin-bottom:6px;"><span class="dim">${e(ex.name)}:</span> ${e(setsTxt)}${r.note ? `<div class="history-note">📝 ${e(r.note)}</div>` : ''}</div>`;
+    summary += `<div class="mt-10" style="margin-bottom:12px;"><span class="dim" style="font-weight:600;">${e(ex.name)}:</span> <span style="font-weight:700;">${e(setsTxt)}</span>${r.note ? `<div class="history-note">${e(r.note)}</div>` : ''}</div>`;
   });
   const nid = findNextDayId(h.dayId);
-  return `<div style="font-size:48px;text-align:center;margin-top:24px;">💪</div><h1 class="center">Тренировка сохранена!</h1><p class="center dim" style="margin-bottom:20px">${e(state.plans[h.dayId]?.title || h.dayTitle || '')}</p><div class="card">${summary || '<div class="dim">Нет данных</div>'}</div>${nid ? `<button class="btn btn-primary" data-action="nextDay" data-id="${e(nid)}">Следующий день →</button>` : ''}<button class="btn btn-secondary mt-10" data-action="goMenu">← В меню</button><button class="btn btn-secondary btn-small mt-10" data-action="openHistory">📊 История</button>`;
+  return `
+    <div style="text-align:center; margin-top:40px; margin-bottom:24px;">
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:80px; height:80px; background:rgba(204,255,0,0.1); border-radius:50%; color:var(--accent); margin-bottom:16px;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <h1 style="margin:0;">Готово!</h1>
+      <p class="dim" style="margin-top:8px; font-weight:500;">Тренировка сохранена</p>
+    </div>
+    
+    <div class="card" style="background:var(--surface); padding:20px; border-radius:var(--radius-md); border:var(--border); margin-bottom:24px;">
+      ${summary || '<div class="dim">Нет данных</div>'}
+    </div>
+    
+    ${nid ? `<button class="btn btn-primary" data-action="nextDay" data-id="${e(nid)}">Следующий день ${ICON.arrowRight}</button>` : ''}
+    <button class="btn btn-secondary mt-10" data-action="goMenu">В меню</button>
+  `;
 }
 
 function buildLibraryItem(id, ex) {
@@ -224,7 +322,7 @@ function buildLibraryItem(id, ex) {
   return `<div class="lib-item" data-action="pickExercise" data-id="${e(id)}">
     <div class="lib-item-title">${e(ex.name)}</div>
     <div class="lib-item-meta">${e(ex.muscle)} · ${ex.sets} × ${rs(ex)}</div>
-    ${inDays.length > 0 ? `<div class="lib-item-in">✓ Уже в: ${inDays.map(e).join(', ')}</div>` : ''}
+    ${inDays.length > 0 ? `<div class="lib-item-in">${ICON.check} В: ${inDays.map(e).join(', ')}</div>` : ''}
   </div>`;
 }
 
@@ -250,16 +348,21 @@ export function renderLibraryList() {
 function renderLibrary() {
   const chips = M.map(m => `<button class="chip ${m === state.libFilter ? 'active' : ''}" data-action="setFilter" data-id="${e(m)}">${e(m)}</button>`).join('');
   const pickBanner = state.pickForDayId && state.plans[state.pickForDayId]
-    ? `<div class="pick-banner">Выберите упражнение для «${e(state.plans[state.pickForDayId].title)}»</div>` : '';
-  return `<div class="top-bar"><h1>📚 Библиотека</h1><button class="close-btn" data-action="exitLibrary" aria-label="Закрыть">✕</button></div>
+    ? `<div class="pick-banner">Выберите для «${e(state.plans[state.pickForDayId].title)}»</div>` : '';
+  return `
+    <div class="top-bar">
+      <h1>Библиотека</h1>
+      <button class="close-btn" data-action="exitLibrary">${ICON.x}</button>
+    </div>
     ${pickBanner}
     <input type="text" class="search-input" id="searchInput" placeholder="Поиск упражнения..." value="${e(state.libSearch)}">
     <div class="chips">${chips}</div>
-    <div id="libList">${renderLibraryList()}</div>`;
+    <div id="libList">${renderLibraryList()}</div>
+  `;
 }
 
 function renderHistory() {
-  if (state.history.length === 0) return `<div class="top-bar"><h1>📊 История</h1><button class="close-btn" data-action="goMenu" aria-label="В меню">✕</button></div><div class="empty">История пуста.</div>`;
+  if (state.history.length === 0) return `<div class="top-bar"><h1>История</h1><button class="close-btn" data-action="goMenu">${ICON.x}</button></div><div class="empty">История пуста.</div>`;
   let items = '';
   state.history.forEach(h => {
     let exLines = '';
@@ -267,48 +370,63 @@ function renderHistory() {
       if (!r || !Array.isArray(r.sets)) return;
       const ex = EXERCISES[r.id]; if (!ex) return;
       const setsTxt = r.sets.map(s => ex.unit === 'свой вес' ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', ');
-      exLines += `<div class="history-ex"><span class="history-ex-name">${e(ex.name)}:</span> ${e(setsTxt)}${r.note ? `<div class="history-note">📝 ${e(r.note)}</div>` : ''}</div>`;
+      exLines += `<div class="history-ex"><span class="history-ex-name">${e(ex.name)}:</span> ${e(setsTxt)}${r.note ? `<div class="history-note">${e(r.note)}</div>` : ''}</div>`;
     });
     items += `<div class="history-item"><div class="history-date">${e(fd(h.ts))} · ${e(h.dayTitle || '')}</div>${exLines}</div>`;
   });
-  return `<div class="top-bar"><h1>📊 История</h1><button class="close-btn" data-action="goMenu" aria-label="В меню">✕</button></div><button class="btn btn-secondary btn-small" data-action="exportCsv" style="margin-bottom:12px;">📥 Экспорт в CSV</button>${items}`;
+  return `
+    <div class="top-bar">
+      <h1>История</h1>
+      <button class="close-btn" data-action="goMenu">${ICON.x}</button>
+    </div>
+    <button class="btn btn-secondary btn-small" data-action="exportCsv" style="margin-bottom:24px;">${ICON.download} Экспорт в CSV</button>
+    ${items}
+  `;
 }
 
 function renderDayEdit() {
   const id = state.editingDayId;
   const d = id ? state.plans[id] : null;
-  if (!d) return `<div class="top-bar"><h1>День</h1><button class="close-btn" data-action="closeDayEdit" aria-label="Назад">✕</button></div><div class="empty">День не найден.</div>`;
+  if (!d) return `<div class="top-bar"><h1>День</h1><button class="close-btn" data-action="closeDayEdit">${ICON.x}</button></div><div class="empty">День не найден.</div>`;
   const isCustom = id.startsWith('custom_');
   let rows = '';
   d.exercises.forEach((exId, i) => {
     const ex = EXERCISES[exId]; if (!ex) return;
     rows += `<div class="ex-edit-row">
-      <button class="ex-edit-btn" data-action="moveEx" data-day="${e(id)}" data-idx="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Вверх">↑</button>
-      <button class="ex-edit-btn" data-action="moveEx" data-day="${e(id)}" data-idx="${i}" data-dir="1" ${i === d.exercises.length - 1 ? 'disabled' : ''} aria-label="Вниз">↓</button>
       <div class="ex-edit-name">${e(ex.name)}</div>
-      <button class="ex-edit-btn remove" data-action="removeExFromDayEdit" data-day="${e(id)}" data-idx="${i}" aria-label="Удалить">✕</button>
+      <button class="ex-edit-btn" data-action="moveEx" data-day="${e(id)}" data-idx="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''}>${ICON.arrowUp}</button>
+      <button class="ex-edit-btn" data-action="moveEx" data-day="${e(id)}" data-idx="${i}" data-dir="1" ${i === d.exercises.length - 1 ? 'disabled' : ''}>${ICON.arrowDown}</button>
+      <button class="ex-edit-btn remove" data-action="removeExFromDayEdit" data-day="${e(id)}" data-idx="${i}">${ICON.trash}</button>
     </div>`;
   });
   const deleteBtn = isCustom ? `<button class="btn btn-danger btn-small mt-16" data-action="deleteDay" data-id="${e(id)}">Удалить день</button>` : '';
-  return `<div class="top-bar"><div><div class="progress-label">Редактирование</div><h1 style="margin:0">${e(d.title)}</h1></div><button class="close-btn" data-action="closeDayEdit" aria-label="Закрыть">✕</button></div>
-    <div style="margin-bottom:12px">${rows || '<div class="empty">Нет упражнений. Добавьте из библиотеки.</div>'}</div>
-    <button class="btn btn-primary btn-small" data-action="addExFromDayEdit">➕ Добавить упражнение</button>
-    ${deleteBtn}`;
+  return `
+    <div class="top-bar">
+      <div>
+        <div class="progress-label">Редактирование</div>
+        <h1 style="margin:0;">${e(d.title)}</h1>
+      </div>
+      <button class="close-btn" data-action="closeDayEdit">${ICON.x}</button>
+    </div>
+    <div style="margin-bottom:24px">${rows || '<div class="empty">Нет упражнений.</div>'}</div>
+    <button class="btn btn-primary btn-small" data-action="addExFromDayEdit">${ICON.plus} Добавить упражнение</button>
+    ${deleteBtn}
+  `;
 }
 
 function renderAddDialog() {
   const p = state.pendingAdd; if (!p?.exId) return '';
   const ex = EXERCISES[p.exId]; if (!ex) return '';
-  const gifHtml = ex.gif ? `<div class="gif-block" style="height: 150px; margin-bottom: 12px;"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"><div class="gif-placeholder">🏋️</div></div>` : '';
+  const gifHtml = ex.gif ? `<div class="gif-block" style="height: 150px; margin-bottom: 16px;"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"></div>` : '';
   const btns = Object.entries(state.plans).map(([dId, d]) => {
     const has = d.exercises.includes(p.exId);
-    return `<button class="modal-day-btn" data-action="${has ? 'removeExFromDay' : 'addExToDay'}" data-day="${e(dId)}" data-ex="${e(p.exId)}"><span>${e(d.title)}</span>${has ? '<span class="remove-action">Удалить ✕</span>' : '<span class="add-action">Добавить ＋</span>'}</button>`;
+    return `<button class="modal-day-btn" data-action="${has ? 'removeExFromDay' : 'addExToDay'}" data-day="${e(dId)}" data-ex="${e(p.exId)}"><span>${e(d.title)}</span>${has ? '<span class="remove-action">Удалить</span>' : '<span class="add-action">Добавить</span>'}</button>`;
   }).join('');
-  return `<div class="modal-backdrop" id="addDialogBackdrop"><div class="modal">${gifHtml}<h3>Управление в днях</h3><p class="dim small" style="margin-bottom:12px">${e(ex.name)}</p>${btns}<button class="btn btn-secondary btn-small mt-10" data-action="closeAddDialog">Закрыть</button></div></div>`;
+  return `<div class="modal-backdrop" id="addDialogBackdrop"><div class="modal">${gifHtml}<h3>${e(ex.name)}</h3>${btns}<button class="btn btn-secondary btn-small mt-10" data-action="closeAddDialog">Закрыть</button></div></div>`;
 }
 
 function renderNewDayDialog() {
-  return `<div class="modal-backdrop" id="newDayDialogBackdrop"><div class="modal"><h3>Создать новый день</h3><input type="text" class="modal-input" id="newDayNameInput" maxlength="50" placeholder="Например: День 5 · Спина+Бицепс" value="${e(state.newDayName || '')}"><button class="btn btn-primary" data-action="createNewDay">Создать</button><button class="btn btn-secondary btn-small mt-10" data-action="closeNewDay">Отмена</button></div></div>`;
+  return `<div class="modal-backdrop" id="newDayDialogBackdrop"><div class="modal"><h3>Новый день</h3><input type="text" class="modal-input" id="newDayNameInput" maxlength="50" placeholder="Название дня..." value="${e(state.newDayName || '')}"><button class="btn btn-primary" data-action="createNewDay">Создать</button><button class="btn btn-secondary btn-small mt-10" data-action="closeNewDay">Отмена</button></div></div>`;
 }
 
 let csvModalData = null;
@@ -319,9 +437,8 @@ function showCsvModal(csv) {
     <div class="modal-backdrop" id="csvModalBackdrop">
       <div class="modal">
         <h3>Экспорт CSV</h3>
-        <p class="dim small" style="margin-bottom:8px">Скопируйте данные ниже:</p>
         <textarea class="modal-input" readonly id="csvText" style="min-height:200px;font-family:monospace;font-size:12px;resize:vertical;">${e(csv)}</textarea>
-        <button class="btn btn-primary" data-action="copyCsv">📋 Скопировать</button>
+        <button class="btn btn-primary" data-action="copyCsv">Скопировать</button>
         <button class="btn btn-secondary btn-small mt-10" data-action="closeCsvModal">Закрыть</button>
       </div>
     </div>
@@ -377,7 +494,7 @@ function updateRestUI() {
   }
   const c = `${Math.floor(rem / 60)}:${String(rem % 60).padStart(2, '0')}`;
   if (!overlay) {
-    document.body.insertAdjacentHTML('beforeend', `<div class="rest-overlay" id="restOverlay"><div class="rest-label-top">Отдых</div><div class="rest-countdown" id="restCount">${c}</div><div class="rest-label-bottom">Отдохните и продолжайте</div><div class="rest-buttons"><button class="rest-btn" data-action="restMinus">−15</button><button class="rest-btn" data-action="restPlus">+15</button></div><button class="rest-skip" data-action="restSkip">Пропустить отдых →</button></div>`);
+    document.body.insertAdjacentHTML('beforeend', `<div class="rest-overlay" id="restOverlay"><div class="rest-label-top">Отдых</div><div class="rest-countdown" id="restCount">${c}</div><div class="rest-label-bottom">Восстановление</div><div class="rest-buttons"><button class="rest-btn" data-action="restMinus">−15</button><button class="rest-btn" data-action="restPlus">+15</button></div><button class="rest-skip" data-action="restSkip">Пропустить отдых</button></div>`);
     startRestTicker();
   } else { const el = $('restCount'); if (el) el.textContent = c; }
 }
@@ -524,7 +641,7 @@ async function deleteDay(id) {
   const d = state.plans[id]; if (!d) return;
   const isActive = state.workout?.dayId === id;
   const msg = isActive
-    ? `Удалить день "${d.title}"? Активная тренировка будет прервана без сохранения.`
+    ? `Удалить день "${d.title}"? Активная тренировка будет прервана.`
     : `Удалить день "${d.title}"?`;
   const ok = await uiConfirm(msg);
   if (!ok) return;
