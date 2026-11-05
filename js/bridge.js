@@ -1,3 +1,9 @@
+/**
+ * Файл: js/bridge.js
+ * Версия: 1.3.0
+ * Описание: Обновлена палитра под новый дизайн 2027.
+ */
+
 export const tg = window.WebApp || window.Telegram?.WebApp;
 export const IS_MAX = !!tg;
 
@@ -60,21 +66,21 @@ export function applyTheme() {
   const root = document.documentElement;
   const isLight = tg?.colorScheme === 'light';
   if (isLight) {
-    root.style.setProperty('--b', '#e5e5ea'); root.style.setProperty('--t', '#000000');
-    root.style.setProperty('--d', '#6b7280');
-    root.style.setProperty('--glass-bg', 'rgba(255, 255, 255, 0.65)');
-    root.style.setProperty('--glass-border', 'rgba(0, 0, 0, 0.1)');
-    root.style.setProperty('--i', '#ffffff');
-    root.style.setProperty('--bg-img', 'radial-gradient(circle at top left, #fdfbfb, #ebedee)');
-    try { tg?.setHeaderColor?.('#e5e5ea'); tg?.setBackgroundColor?.('#e5e5ea'); } catch(_) {}
+    root.style.setProperty('--bg', '#F2F2F7'); 
+    root.style.setProperty('--surface', '#FFFFFF');
+    root.style.setProperty('--surface-hover', '#F9F9FB');
+    root.style.setProperty('--text-main', '#000000');
+    root.style.setProperty('--text-muted', '#8E8E93');
+    root.style.setProperty('--border', '1px solid rgba(0, 0, 0, 0.08)');
+    try { tg?.setHeaderColor?.('#F2F2F7'); tg?.setBackgroundColor?.('#F2F2F7'); } catch(_) {}
   } else {
-    root.style.setProperty('--b', '#0f0f11'); root.style.setProperty('--t', '#ffffff');
-    root.style.setProperty('--d', '#8b96a5');
-    root.style.setProperty('--glass-bg', 'rgba(30, 30, 35, 0.65)');
-    root.style.setProperty('--glass-border', 'rgba(255, 255, 255, 0.08)');
-    root.style.setProperty('--i', '#1c1c21');
-    root.style.setProperty('--bg-img', 'radial-gradient(circle at top left, #1a1a24, #0f0f11)');
-    try { tg?.setHeaderColor?.('#0f0f11'); tg?.setBackgroundColor?.('#0f0f11'); } catch(_) {}
+    root.style.setProperty('--bg', '#09090B');
+    root.style.setProperty('--surface', '#141417');
+    root.style.setProperty('--surface-hover', '#1C1C21');
+    root.style.setProperty('--text-main', '#FFFFFF');
+    root.style.setProperty('--text-muted', '#8E8E93');
+    root.style.setProperty('--border', '1px solid rgba(255, 255, 255, 0.08)');
+    try { tg?.setHeaderColor?.('#09090B'); tg?.setBackgroundColor?.('#09090B'); } catch(_) {}
   }
 }
 
