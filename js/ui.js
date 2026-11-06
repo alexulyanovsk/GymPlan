@@ -1,10 +1,13 @@
 /**
  * Файл: js/ui.js
- * Версия: 10.0.0
- * Описание: Финальная сборка. Карандаш на месте, гантель идеальна, GIF растянут.
+ * Версия: 11.0.0
+ * Описание: Схемы через getExScheme, устранены P0–P2 из аудита.
  */
 
-import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
+import {
+  state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues,
+  getInDays, exportData, invalidatePlanCaches, invalidateHistoryCaches, getExScheme
+} from './state.js';
 import { M, EX_ENTRIES, EXERCISES, LIMITS } from './data.js';
 import { $, e, fn, pn, rs, ws, fd } from './utils.js';
 import { tg, haptic, hapticNotify, uiConfirm, uiAlert, enableCloseConfirm, disableCloseConfirm } from './bridge.js';
@@ -32,8 +35,6 @@ const ICON = {
   trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
-  
-  // Твоя идеальная гантель (через маску, чтобы фон был прозрачным)
   dumbbell: `<svg width="120" height="120" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
@@ -49,6 +50,18 @@ const ICON = {
     </g>
   </svg>`
 };
+
+// ============ CSV injection protection ============
+function csvSafe(s) {
+  const str = String(s ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) return "'" + str;
+  return str;
+}
+
+// ============ helpers ============
+function isActiveDay(dayId) {
+  return !!(state.workout && state.workout.dayId === dayId);
+}
 
 export function handleBack() {
   if (state.pendingAdd) { closeAddDialog(); return true; }
@@ -79,8 +92,15 @@ export function initBridgeEvents() {
 
 export function render() {
   const app = $('app');
+  if (!app) return;
   const scrollTop = window.scrollY;
-  
+
+  // Защита от renderComplete, который может сменить screen
+  if (state.screen === 'complete') {
+    const h0 = state.history[0];
+    if (!h0 || h0.ts !== state.lastCompletedTs) state.screen = 'menu';
+  }
+
   app.className = `layout-${state.screen}`;
 
   if ($('csvModalBackdrop') && state.screen !== 'history') closeCsvModal();
@@ -101,7 +121,7 @@ export function render() {
     case 'dayEdit': html = renderDayEdit(); break;
     default: html = renderMenu();
   }
-  
+
   app.innerHTML = html;
 
   document.getElementById('addDialogBackdrop')?.remove();
@@ -166,7 +186,8 @@ export function render() {
 
 function syncTelegramUI() {
   if (!tg) return;
-  const w = state.workout, ex = getCurrentEx();
+  const w = state.workout;
+  const ex = getCurrentEx();
   const day = w ? state.plans[w.dayId] : null;
   const allDone = w && ex && w.tempSets.length >= ex.sets;
   const isLastEx = day && w && w.exIdx >= day.exercises.length - 1;
@@ -189,6 +210,7 @@ function syncTelegramUI() {
 
 function renderMenu() {
   const hasPlans = Object.keys(state.plans).length > 0;
+  const hasHistory = state.history.length > 0;
 
   if (!hasPlans) {
     return `
@@ -212,10 +234,15 @@ function renderMenu() {
         <button class="btn btn-secondary mt-10" data-action="openNewDay" style="width:100%; max-width:300px;">
           ${ICON.plus} Создать вручную
         </button>
+        ${hasHistory ? `
+        <button class="btn btn-secondary mt-10" data-action="openHistory" style="width:100%; max-width:300px;">
+          ${ICON.chart} История
+        </button>` : ''}
       </div>
       
       <div class="menu-footer">
         <div style="display:flex; gap:8px;">
+          ${hasHistory ? `<button class="btn btn-secondary btn-small" data-action="exportCsv" style="flex:1; padding:12px;">${ICON.download} CSV</button>` : ''}
           <button class="btn btn-secondary btn-small" data-action="importData" style="flex:1; padding:12px;">${ICON.download} Импорт</button>
         </div>
       </div>
@@ -224,11 +251,10 @@ function renderMenu() {
 
   let daysHtml = '';
   Object.entries(state.plans).forEach(([id, d], idx) => {
-    const c = d.exercises.length; const s = c === 1 ? 'упражнение' : c < 5 ? 'упражнения' : 'упражнений';
-    
+    const c = d.exercises.length;
+    const s = c === 1 ? 'упражнение' : c < 5 ? 'упражнения' : 'упражнений';
     const isCompleted = state.history.length > 0 && state.history[0].dayId === id && state.lastCompletedTs > 0;
     const isActive = state.workout && state.workout.dayId === id;
-
     const numClass = isCompleted && !isActive ? 'text-muted' : 'text-accent';
     const cardClass = isCompleted && !isActive ? 'completed' : '';
     const subText = isCompleted && !isActive ? `${c} ${s} · Выполнено` : `${c} ${s}`;
@@ -245,7 +271,7 @@ function renderMenu() {
 
   const hasProgress = state.workout && (state.workout.tempSets.length > 0 || state.workout.results.length > 0);
   const canResume = hasProgress && state.plans[state.workout.dayId];
-  
+
   const resumeBtn = canResume ? `<button class="bento-card full-width quick-start" data-action="resumeWorkout">
       <div style="color:var(--accent);">${ICON.play}</div>
       <div>
@@ -255,7 +281,7 @@ function renderMenu() {
     </button>` : '';
 
   const lastDay = state.currentDayId ? state.plans[state.currentDayId] : null;
-  const qs = !canResume && lastDay && !(state.history.length > 0 && state.history[0].dayId === lastDay.id)
+  const qs = !canResume && lastDay && !(state.history.length > 0 && state.history[0].dayId === state.currentDayId)
     ? `<button class="bento-card full-width quick-start" data-action="beginWorkout" data-id="${e(state.currentDayId)}">
         <div style="color:var(--accent);">${ICON.play}</div>
         <div>
@@ -294,21 +320,28 @@ function renderMenu() {
 }
 
 function renderWorkout() {
-  const w = state.workout; if (!w) return '<div class="empty">Ошибка: тренировка не начата</div>';
+  const w = state.workout;
+  if (!w) return '<div class="empty">Ошибка: тренировка не начата</div>';
   const day = state.plans[w.dayId];
   if (!day) return `<div class="top-bar"><h1>Ошибка</h1><button class="close-btn" data-action="goMenu">${ICON.x}</button></div><div class="empty">День не найден.<br><button class="btn btn-primary btn-small btn-centered mt-16" data-action="goMenu">В меню</button></div>`;
   const exId = day.exercises[w.exIdx];
   if (!exId) return `<div class="top-bar"><h1>Ошибка</h1><button class="close-btn" data-action="goMenu">${ICON.x}</button></div><div class="empty">Упражнение не найдено.</div>`;
-  const ex = EXERCISES[exId]; if (!ex) return `<div class="empty">Данные упражнения не найдены.</div>`;
+  const ex = getExScheme(w.dayId, exId);
+  if (!ex) return `<div class="empty">Данные упражнения не найдены.</div>`;
   const isBW = ex.unit === 'свой вес';
   const wVal = Number.isFinite(w.currentWeight) ? w.currentWeight : 0;
   const rVal = Number.isFinite(w.currentReps) ? w.currentReps : 1;
-  const allDone = w.tempSets.length >= ex.sets, extra = Math.max(0, w.tempSets.length - ex.sets);
-  const last = getLastAttempt(exId), prog = progressionHint(exId);
-  const lastBlock = last && last.length > 0 ? `<div class="last-block">Прошлый раз: ${e(last.map(s => isBW ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', '))}</div>` : '';
-  const hintBlock = prog ? `<div class="hint-block">${prog}</div>` : '';
-  const gifHtml = ex.gif ? `<div class="gif-block"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"><div class="gif-placeholder">🏋️</div></div>` : `<div class="gif-block no-gif"><div class="gif-placeholder">🏋️</div></div>`;
-  
+  const allDone = w.tempSets.length >= ex.sets;
+  const extra = Math.max(0, w.tempSets.length - ex.sets);
+  const last = getLastAttempt(exId);
+  const prog = progressionHint(w.dayId, exId);
+  const lastBlock = last && last.length > 0
+    ? `<div class="last-block">Прошлый раз: ${e(last.map(s => isBW ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', '))}</div>` : '';
+  const hintBlock = prog ? `<div class="hint-block">${e(prog)}</div>` : '';
+  const gifHtml = ex.gif
+    ? `<div class="gif-block"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"><div class="gif-placeholder">🏋️</div></div>`
+    : `<div class="gif-block no-gif"><div class="gif-placeholder">🏋️</div></div>`;
+
   const weightCtrls = isBW ? '' : `
     <div class="controls-row">
       <button class="circle-btn" data-action="decW">−</button>
@@ -366,12 +399,12 @@ function renderWorkout() {
 
 function renderComplete() {
   const h = state.history[0];
-  const isThisSession = h && h.ts === state.lastCompletedTs;
-  if (!h || !isThisSession) { state.screen = 'menu'; return renderMenu(); }
+  if (!h || h.ts !== state.lastCompletedTs) { state.screen = 'menu'; return renderMenu(); }
   let summary = '';
   (h.exercises || []).forEach(r => {
     if (!r || !Array.isArray(r.sets)) return;
-    const ex = EXERCISES[r.id]; if (!ex) return;
+    const ex = EXERCISES[r.id];
+    if (!ex) return;
     const isBW = ex.unit === 'свой вес';
     const setsTxt = r.sets.map(s => isBW ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', ');
     summary += `<div class="mt-10" style="margin-bottom:12px;"><span class="dim" style="font-weight:600;">${e(ex.name)}:</span> <span style="font-weight:700;">${e(setsTxt)}</span>${r.note ? `<div class="history-note">${e(r.note)}</div>` : ''}</div>`;
@@ -414,7 +447,10 @@ export function renderLibraryList() {
     M.forEach(m => {
       if (m === 'Все') return;
       const exs = filtered.filter(([_, ex]) => ex.muscle === m);
-      if (exs.length > 0) { html += `<div class="lib-group-title">${m}</div>`; exs.forEach(([id, ex]) => { html += buildLibraryItem(id, ex); }); }
+      if (exs.length > 0) {
+        html += `<div class="lib-group-title">${m}</div>`;
+        exs.forEach(([id, ex]) => { html += buildLibraryItem(id, ex); });
+      }
     });
     return html || '<div class="empty">Ничего не найдено</div>';
   }
@@ -444,7 +480,8 @@ function renderHistory() {
     let exLines = '';
     (h.exercises || []).forEach(r => {
       if (!r || !Array.isArray(r.sets)) return;
-      const ex = EXERCISES[r.id]; if (!ex) return;
+      const ex = EXERCISES[r.id];
+      if (!ex) return;
       const setsTxt = r.sets.map(s => ex.unit === 'свой вес' ? `${s.reps}с` : `${fn(s.weight)}×${s.reps}`).join(', ');
       exLines += `<div class="history-ex"><span class="history-ex-name">${e(ex.name)}:</span> ${e(setsTxt)}${r.note ? `<div class="history-note">${e(r.note)}</div>` : ''}</div>`;
     });
@@ -465,9 +502,11 @@ function renderDayEdit() {
   const d = id ? state.plans[id] : null;
   if (!d) return `<div class="top-bar"><h1>День</h1><button class="close-btn" data-action="closeDayEdit">${ICON.x}</button></div><div class="empty">День не найден.</div>`;
   const isCustom = id.startsWith('custom_') || id.startsWith('gen_');
+  const active = isActiveDay(id);
   let rows = '';
   d.exercises.forEach((exId, i) => {
-    const ex = EXERCISES[exId]; if (!ex) return;
+    const ex = EXERCISES[exId];
+    if (!ex) return;
     rows += `<div class="ex-edit-row">
       <div class="ex-edit-name">${e(ex.name)}</div>
       <button class="ex-edit-btn" data-action="moveEx" data-day="${e(id)}" data-idx="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''}>${ICON.arrowUp}</button>
@@ -475,7 +514,10 @@ function renderDayEdit() {
       <button class="ex-edit-btn remove" data-action="removeExFromDayEdit" data-day="${e(id)}" data-idx="${i}">${ICON.trash}</button>
     </div>`;
   });
-  const deleteBtn = isCustom ? `<button class="btn btn-danger btn-small mt-16" data-action="deleteDay" data-id="${e(id)}">Удалить день</button>` : '';
+  const deleteBtn = isCustom
+    ? `<button class="btn btn-danger btn-small mt-16" data-action="deleteDay" data-id="${e(id)}" ${active ? 'disabled' : ''}>Удалить день</button>` : '';
+  const activeWarn = active
+    ? `<div class="hint-block" style="margin-bottom:16px;">День активен. Редактирование заблокировано до окончания тренировки.</div>` : '';
   return `
     <div class="top-bar">
       <div>
@@ -484,18 +526,26 @@ function renderDayEdit() {
       </div>
       <button class="close-btn" data-action="closeDayEdit">${ICON.x}</button>
     </div>
+    ${activeWarn}
     <div style="margin-bottom:24px">${rows || '<div class="empty">Нет упражнений.</div>'}</div>
-    <button class="btn btn-primary btn-small" data-action="addExFromDayEdit">${ICON.plus} Добавить упражнение</button>
+    <button class="btn btn-primary btn-small" data-action="addExFromDayEdit" ${active ? 'disabled' : ''}>${ICON.plus} Добавить упражнение</button>
     ${deleteBtn}
   `;
 }
 
 function renderAddDialog() {
-  const p = state.pendingAdd; if (!p?.exId) return '';
-  const ex = EXERCISES[p.exId]; if (!ex) return '';
-  const gifHtml = ex.gif ? `<div class="gif-block" style="height: 150px; margin-bottom: 16px;"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"></div>` : '';
+  const p = state.pendingAdd;
+  if (!p?.exId) return '';
+  const ex = EXERCISES[p.exId];
+  if (!ex) return '';
+  const gifHtml = ex.gif
+    ? `<div class="gif-block" style="height: 150px; margin-bottom: 16px;"><img src="${e(ex.gif)}" alt="${e(ex.name)}" referrerpolicy="no-referrer"></div>` : '';
   const btns = Object.entries(state.plans).map(([dId, d]) => {
     const has = d.exercises.includes(p.exId);
+    const active = isActiveDay(dId);
+    if (active && !has) {
+      return `<button class="modal-day-btn" disabled style="opacity:0.5;"><span>${e(d.title)}</span><span class="dim">Тренировка активна</span></button>`;
+    }
     return `<button class="modal-day-btn" data-action="${has ? 'removeExFromDay' : 'addExToDay'}" data-day="${e(dId)}" data-ex="${e(p.exId)}"><span>${e(d.title)}</span>${has ? '<span class="remove-action">Удалить</span>' : '<span class="add-action">Добавить</span>'}</button>`;
   }).join('');
   return `<div class="modal-backdrop" id="addDialogBackdrop"><div class="modal">${gifHtml}<h3>${e(ex.name)}</h3>${btns}<button class="btn btn-secondary btn-small mt-10" data-action="closeAddDialog">Закрыть</button></div></div>`;
@@ -576,15 +626,18 @@ function showCsvModal(csv) {
     <div class="modal-backdrop" id="csvModalBackdrop">
       <div class="modal">
         <h3>Экспорт CSV</h3>
-        <textarea class="modal-input" readonly id="csvText" style="min-height:200px;font-family:monospace;font-size:12px;resize:vertical;">${e(csv)}</textarea>
+        <textarea class="modal-input" readonly id="csvText" style="min-height:200px;font-family:monospace;font-size:12px;resize:vertical;"></textarea>
         <button class="btn btn-primary" data-action="copyCsv">Скопировать</button>
         <button class="btn btn-secondary btn-small mt-10" data-action="closeCsvModal">Закрыть</button>
       </div>
     </div>
   `);
-  document.body.classList.add('modal-open');
   const ta = document.getElementById('csvText');
-  if (ta) ta.addEventListener('click', () => ta.select());
+  if (ta) {
+    ta.value = csv;
+    ta.addEventListener('click', () => ta.select());
+  }
+  document.body.classList.add('modal-open');
 }
 function closeCsvModal() {
   const el = document.getElementById('csvModalBackdrop');
@@ -635,14 +688,29 @@ function updateRestUI() {
   if (!overlay) {
     document.body.insertAdjacentHTML('beforeend', `<div class="rest-overlay" id="restOverlay"><div class="rest-label-top">Отдых</div><div class="rest-countdown" id="restCount">${c}</div><div class="rest-label-bottom">Восстановление</div><div class="rest-buttons"><button class="rest-btn" data-action="restMinus">−15</button><button class="rest-btn" data-action="restPlus">+15</button></div><button class="rest-skip" data-action="restSkip">Пропустить отдых</button></div>`);
     startRestTicker();
-  } else { const el = $('restCount'); if (el) el.textContent = c; }
+  } else {
+    const el = $('restCount');
+    if (el) el.textContent = c;
+  }
 }
 
-function beginWorkout(id) {
+async function beginWorkout(id) {
+  if (!state.plans[id]) return;
+  if (state.workout && state.workout.dayId !== id) {
+    const ok = await uiConfirm('У вас есть незавершённая тренировка. Начать новую?');
+    if (!ok) return;
+    state.workout = null;
+    state.rest = null;
+    disableCloseConfirm();
+  }
   const day = state.plans[id];
   if (!day?.exercises?.length) { uiAlert('В этом дне нет упражнений'); return; }
-  const sv = startValues(day.exercises[0]);
-  state.workout = { dayId: id, exIdx: 0, tempSets: [], currentWeight: sv.weight, currentReps: sv.reps, currentNote: '', results: [] };
+  const sv = startValues(id, day.exercises[0]);
+  state.workout = {
+    dayId: id, exIdx: 0, tempSets: [],
+    currentWeight: sv.weight, currentReps: sv.reps,
+    currentNote: '', results: []
+  };
   state.currentDayId = id; state.screen = 'workout'; state.rest = null;
   enableCloseConfirm();
   lastSyncKey = ''; prevRenderKey = '';
@@ -657,7 +725,9 @@ async function doneSet() {
   try {
     const w = state.workout; if (!w) return;
     const day = state.plans[w.dayId]; if (!day) return;
-    const exId = day.exercises[w.exIdx], ex = EXERCISES[exId]; if (!ex) return;
+    const exId = day.exercises[w.exIdx];
+    const ex = getExScheme(w.dayId, exId);
+    if (!ex) return;
     const wI = $('wInput'), rI = $('rInput'), nI = $('noteInput');
     const isBW = ex.unit === 'свой вес';
     const rawW = wI ? wI.value : String(w.currentWeight);
@@ -670,7 +740,7 @@ async function doneSet() {
     w.currentWeight = weight; w.currentReps = reps;
     w.tempSets.push({ weight, reps });
     if (isBW) delete state.weights[exId];
-    else { delete state.weights[exId]; state.weights[exId] = { weight, reps }; }
+    else state.weights[exId] = { weight, reps };
     haptic('medium');
     saveState();
     startRest(LIMITS.restSec);
@@ -684,11 +754,12 @@ function advanceExercise() {
   lastMainBtnAt = Date.now();
   const w = state.workout; if (!w) return;
   const day = state.plans[w.dayId]; if (!day) return;
-  const exId = day.exercises[w.exIdx], ex = EXERCISES[exId];
+  const exId = day.exercises[w.exIdx];
+  const ex = getExScheme(w.dayId, exId);
   if (ex && w.tempSets.length > 0) w.results.push({ id: exId, name: ex.name, sets: w.tempSets.slice(), note: w.currentNote || '' });
   w.tempSets = []; w.currentNote = ''; w.exIdx++;
   if (w.exIdx >= day.exercises.length) { finishWorkout(); return; }
-  const sv = startValues(day.exercises[w.exIdx]);
+  const sv = startValues(w.dayId, day.exercises[w.exIdx]);
   w.currentWeight = sv.weight; w.currentReps = sv.reps; state.rest = null;
   haptic('light'); saveState(); render();
 }
@@ -699,13 +770,14 @@ function skipExercise() {
   lastMainBtnAt = Date.now();
   const w = state.workout; if (!w) return;
   const day = state.plans[w.dayId]; if (!day) return;
-  const exId = day.exercises[w.exIdx], ex = EXERCISES[exId];
+  const exId = day.exercises[w.exIdx];
+  const ex = getExScheme(w.dayId, exId);
   if (ex && w.tempSets.length > 0) {
     w.results.push({ id: exId, name: ex.name, sets: w.tempSets.slice(), note: w.currentNote || '' });
   }
   w.tempSets = []; w.currentNote = ''; w.exIdx++;
   if (w.exIdx >= day.exercises.length) { finishWorkout(); return; }
-  const sv = startValues(day.exercises[w.exIdx]);
+  const sv = startValues(w.dayId, day.exercises[w.exIdx]);
   w.currentWeight = sv.weight; w.currentReps = sv.reps; state.rest = null;
   saveState(); render();
 }
@@ -720,6 +792,7 @@ function finishWorkout() {
   }
   const ts = Date.now();
   state.history.unshift({ ts, dayId: w.dayId, dayTitle: state.plans[w.dayId]?.title || '', exercises: w.results.slice() });
+  if (state.history.length > LIMITS.historyMax) state.history.length = LIMITS.historyMax;
   state.lastCompletedTs = ts;
   state.workout = null; state.currentDayId = null; state.screen = 'complete'; state.rest = null;
   disableCloseConfirm();
@@ -759,19 +832,10 @@ function openNewDay() {
   state.newDayOpen = true; state.newDayName = ''; saveState(); render();
   setTimeout(() => { $('newDayNameInput')?.focus(); }, 100);
 }
-function closeNewDay() {
-  state.newDayOpen = false; state.newDayName = ''; render();
-}
+function closeNewDay() { state.newDayOpen = false; state.newDayName = ''; render(); }
 
-function openGenerator() {
-  state.generatorOpen = true;
-  saveState(); render();
-}
-
-function closeGenerator() {
-  state.generatorOpen = false;
-  saveState(); render();
-}
+function openGenerator() { state.generatorOpen = true; saveState(); render(); }
+function closeGenerator() { state.generatorOpen = false; saveState(); render(); }
 
 function toggleEq(el) {
   const val = el.dataset.val;
@@ -781,9 +845,9 @@ function toggleEq(el) {
       b.classList.toggle('active', b.dataset.val === 'all');
     });
   } else {
-    generatorOptions.equipment = generatorOptions.equipment.filter(e => e !== 'all');
+    generatorOptions.equipment = generatorOptions.equipment.filter(x => x !== 'all');
     if (generatorOptions.equipment.includes(val)) {
-      generatorOptions.equipment = generatorOptions.equipment.filter(e => e !== val);
+      generatorOptions.equipment = generatorOptions.equipment.filter(x => x !== val);
       el.classList.remove('active');
     } else {
       generatorOptions.equipment.push(val);
@@ -791,9 +855,9 @@ function toggleEq(el) {
     }
     if (generatorOptions.equipment.length === 0) {
       generatorOptions.equipment = ['all'];
-      document.querySelector('[data-action="genToggleEq"][data-val="all"]').classList.add('active');
+      document.querySelector('[data-action="genToggleEq"][data-val="all"]')?.classList.add('active');
     } else {
-      document.querySelector('[data-action="genToggleEq"][data-val="all"]').classList.remove('active');
+      document.querySelector('[data-action="genToggleEq"][data-val="all"]')?.classList.remove('active');
     }
   }
 }
@@ -809,7 +873,14 @@ function toggleExcludeGroup(el) {
   }
 }
 
-function applyGeneratedPlan() {
+async function applyGeneratedPlan() {
+  if (state.workout && state.workout.dayId && state.workout.dayId.startsWith('gen_')) {
+    const ok = await uiConfirm('Активная тренировка будет прервана. Продолжить?');
+    if (!ok) return;
+    state.workout = null; state.rest = null; state.screen = 'menu';
+    disableCloseConfirm();
+  }
+
   const newPlans = generatePlan({
     goal: generatorOptions.goal,
     exp: generatorOptions.exp,
@@ -823,6 +894,9 @@ function applyGeneratedPlan() {
     return;
   }
 
+  for (const id of Object.keys(state.plans)) {
+    if (id.startsWith('gen_')) delete state.plans[id];
+  }
   Object.assign(state.plans, newPlans);
   state.generatorOpen = false;
   invalidatePlanCaches();
@@ -837,11 +911,23 @@ function exitLibrary() {
   prevRenderKey = ''; saveState(); render();
 }
 
-function editDay(id) { if (!state.plans[id]) return; state.editingDayId = id; state.screen = 'dayEdit'; saveState(); render(); }
+function editDay(id) {
+  if (!state.plans[id]) return;
+  if (isActiveDay(id)) { uiAlert('Нельзя редактировать день с активной тренировкой'); return; }
+  state.editingDayId = id; state.screen = 'dayEdit'; saveState(); render();
+}
 function closeDayEdit() { state.editingDayId = null; state.pickForDayId = null; state.screen = 'menu'; prevRenderKey = ''; saveState(); render(); }
-function addExFromDayEdit() { if (!state.editingDayId) return; state.pickForDayId = state.editingDayId; state.screen = 'library'; state.libSearch = ''; saveState(); render(); }
+function addExFromDayEdit() {
+  if (!state.editingDayId) return;
+  if (isActiveDay(state.editingDayId)) { uiAlert('День активен'); return; }
+  state.pickForDayId = state.editingDayId;
+  state.screen = 'library';
+  state.libSearch = '';
+  saveState(); render();
+}
 function moveExercise(dayId, idx, dir) {
   const d = state.plans[dayId]; if (!d) return;
+  if (isActiveDay(dayId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
   const newIdx = idx + dir;
   if (newIdx < 0 || newIdx >= d.exercises.length) return;
   [d.exercises[idx], d.exercises[newIdx]] = [d.exercises[newIdx], d.exercises[idx]];
@@ -849,21 +935,19 @@ function moveExercise(dayId, idx, dir) {
 }
 function removeExFromDayEdit(dayId, idx) {
   const d = state.plans[dayId]; if (!d) return;
+  if (isActiveDay(dayId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
   d.exercises.splice(idx, 1);
+  if (d.schemes && d.schemes[d.exercises[idx]]) delete d.schemes[d.exercises[idx]];
   invalidatePlanCaches(); saveState(); render();
 }
 async function deleteDay(id) {
   const d = state.plans[id]; if (!d) return;
-  const isActive = state.workout?.dayId === id;
-  const msg = isActive
-    ? `Удалить день "${d.title}"? Активная тренировка будет прервана.`
-    : `Удалить день "${d.title}"?`;
-  const ok = await uiConfirm(msg);
+  if (isActiveDay(id)) { uiAlert('Нельзя удалить день с активной тренировкой'); return; }
+  const ok = await uiConfirm(`Удалить день "${d.title}"?`);
   if (!ok) return;
   delete state.plans[id];
   if (state.currentDayId === id) state.currentDayId = null;
   if (state.editingDayId === id) state.editingDayId = null;
-  if (state.workout && state.workout.dayId === id) { state.workout = null; state.rest = null; }
   invalidatePlanCaches();
   state.screen = 'menu'; prevRenderKey = '';
   saveState(); render();
@@ -873,7 +957,7 @@ function createNewDay() {
   const i = $('newDayNameInput'), n = (i?.value || state.newDayName || '').trim().slice(0, 50);
   if (!n) { uiAlert('Введите название'); return; }
   const id = 'custom_' + Date.now();
-  state.plans[id] = { title: n, exercises: [] };
+  state.plans[id] = { title: n, exercises: [], schemes: {} };
   state.newDayOpen = false; state.newDayName = '';
   state.editingDayId = id; state.screen = 'dayEdit';
   invalidatePlanCaches(); prevRenderKey = '';
@@ -885,7 +969,10 @@ function pickExercise(exId) {
   if (state.pendingAdd) return;
   if (state.pickForDayId) {
     const day = state.plans[state.pickForDayId];
-    if (day && !day.exercises.includes(exId)) day.exercises.push(exId);
+    if (day && !day.exercises.includes(exId)) {
+      if (isActiveDay(state.pickForDayId)) { uiAlert('День активен'); return; }
+      day.exercises.push(exId);
+    }
     state.pickForDayId = null; state.screen = 'dayEdit';
     invalidatePlanCaches(); prevRenderKey = '';
     saveState(); render();
@@ -895,12 +982,17 @@ function pickExercise(exId) {
 }
 function addExToDay(dId, exId) {
   const d = state.plans[dId];
+  if (isActiveDay(dId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
   if (d && EXERCISES[exId] && !d.exercises.includes(exId)) d.exercises.push(exId);
   state.pendingAdd = null; invalidatePlanCaches(); saveState(); render();
 }
 function removeExFromDay(dId, exId) {
   const d = state.plans[dId];
-  if (d) d.exercises = d.exercises.filter(x => x !== exId);
+  if (isActiveDay(dId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
+  if (d) {
+    d.exercises = d.exercises.filter(x => x !== exId);
+    if (d.schemes) delete d.schemes[exId];
+  }
   state.pendingAdd = null; invalidatePlanCaches(); saveState(); render();
 }
 function closeAddDialog() { state.pendingAdd = null; render(); }
@@ -919,11 +1011,16 @@ function adjustReps(d) {
 }
 
 function findNextDayId(cId) {
-  const ids = Object.keys(state.plans); if (!ids.length) return null;
+  const ids = Object.keys(state.plans);
+  if (!ids.length) return null;
   const idx = ids.indexOf(cId);
   return idx < 0 ? ids[0] : ids[(idx + 1) % ids.length];
 }
-function goNextDay(id) { state.workout = null; state.currentDayId = null; state.screen = 'menu'; lastSyncKey = ''; prevRenderKey = ''; saveState(); beginWorkout(id); }
+function goNextDay(id) {
+  state.workout = null; state.currentDayId = null; state.screen = 'menu';
+  lastSyncKey = ''; prevRenderKey = '';
+  saveState(); beginWorkout(id);
+}
 
 async function exportCsv() {
   if (csvExportRunning) return;
@@ -933,8 +1030,13 @@ async function exportCsv() {
     let csv = 'Дата;День;Упражнение;Подход;Вес;Повторы;Заметка\n';
     state.history.forEach(h => (h.exercises || []).forEach(r => {
       if (!r || !Array.isArray(r.sets)) return;
-      const ex = EXERCISES[r.id], n = (ex?.name || r.id || '').replace(/"/g, '""'), note = (r.note || '').replace(/"/g, '""');
-      r.sets.forEach((s, i) => { csv += `"${fd(h.ts)}";"${(h.dayTitle || '').replace(/"/g, '""')}";"${n}";${i + 1};${s.weight};${s.reps};"${note}"\n`; });
+      const ex = EXERCISES[r.id];
+      const name = csvSafe(ex?.name || r.id || '').replace(/"/g, '""');
+      const note = csvSafe(r.note || '').replace(/"/g, '""');
+      const dayTitle = csvSafe(h.dayTitle || '').replace(/"/g, '""');
+      r.sets.forEach((s, i) => {
+        csv += `"${fd(h.ts)}";"${dayTitle}";"${name}";${i + 1};${s.weight};${s.reps};"${note}"\n`;
+      });
     }));
     const filename = 'gymplan_' + Date.now() + '.csv';
 
@@ -974,12 +1076,27 @@ async function exportCsv() {
 
 export const ACTIONS = {
   beginWorkout: el => beginWorkout(el.dataset.id),
-  resumeWorkout: () => { if (state.workout) { state.screen = 'workout'; prevRenderKey = ''; saveState(); render(); } },
-  doneSet: () => doneSet(), advanceExercise: () => advanceExercise(), skipExercise: () => skipExercise(),
-  cancelWorkout: () => cancelWorkout(), goMenu: () => goMenu(),
-  openLibrary: () => openLibrary(), exitLibrary: () => exitLibrary(), openHistory: () => openHistory(),
-  openNewDay: () => openNewDay(), closeNewDay: () => closeNewDay(), createNewDay: () => createNewDay(),
-  openGenerator: () => openGenerator(), closeGenerator: () => closeGenerator(),
+  resumeWorkout: () => {
+    if (state.workout) {
+      state.screen = 'workout';
+      enableCloseConfirm();
+      prevRenderKey = '';
+      saveState(); render();
+    }
+  },
+  doneSet: () => doneSet(),
+  advanceExercise: () => advanceExercise(),
+  skipExercise: () => skipExercise(),
+  cancelWorkout: () => cancelWorkout(),
+  goMenu: () => goMenu(),
+  openLibrary: () => openLibrary(),
+  exitLibrary: () => exitLibrary(),
+  openHistory: () => openHistory(),
+  openNewDay: () => openNewDay(),
+  closeNewDay: () => closeNewDay(),
+  createNewDay: () => createNewDay(),
+  openGenerator: () => openGenerator(),
+  closeGenerator: () => closeGenerator(),
   generatePlanAction: () => applyGeneratedPlan(),
   genSetGoal: el => { generatorOptions.goal = el.dataset.val; document.querySelectorAll('[data-action="genSetGoal"]').forEach(b => b.classList.toggle('active', b.dataset.val === el.dataset.val)); },
   genSetExp: el => { generatorOptions.exp = el.dataset.val; document.querySelectorAll('[data-action="genSetExp"]').forEach(b => b.classList.toggle('active', b.dataset.val === el.dataset.val)); },
@@ -1010,10 +1127,15 @@ export const ACTIONS = {
   removeExFromDay: el => removeExFromDay(el.dataset.day, el.dataset.ex),
   closeAddDialog: () => closeAddDialog(),
   nextDay: el => goNextDay(el.dataset.id),
-  restPlus: () => adjustRest(15), restMinus: () => adjustRest(-15), restSkip: () => skipRest(),
-  incW: () => adjustWeight(getCurrentEx()?.inc || 2.5), decW: () => adjustWeight(-(getCurrentEx()?.inc || 2.5)),
-  incR: () => adjustReps(getCurrentEx()?.unit === 'свой вес' ? 5 : 1), decR: () => adjustReps(getCurrentEx()?.unit === 'свой вес' ? -5 : -1),
-  editDay: el => editDay(el.dataset.id), closeDayEdit: () => closeDayEdit(),
+  restPlus: () => adjustRest(15),
+  restMinus: () => adjustRest(-15),
+  restSkip: () => skipRest(),
+  incW: () => adjustWeight(getCurrentEx()?.inc || 2.5),
+  decW: () => adjustWeight(-(getCurrentEx()?.inc || 2.5)),
+  incR: () => adjustReps(getCurrentEx()?.unit === 'свой вес' ? 5 : 1),
+  decR: () => adjustReps(getCurrentEx()?.unit === 'свой вес' ? -5 : -1),
+  editDay: el => editDay(el.dataset.id),
+  closeDayEdit: () => closeDayEdit(),
   addExFromDayEdit: () => addExFromDayEdit(),
   moveEx: el => moveExercise(el.dataset.day, Number(el.dataset.idx), Number(el.dataset.dir)),
   removeExFromDayEdit: el => removeExFromDayEdit(el.dataset.day, Number(el.dataset.idx)),
