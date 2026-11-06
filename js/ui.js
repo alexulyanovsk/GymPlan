@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 3.6.0
- * Описание: Точная SVG-гантель. Исправлен баг с быстрым стартом.
+ * Версия: 3.7.0
+ * Описание: Точная SVG-гантель. Исправлена верстка экрана тренировки.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -33,13 +33,15 @@ const ICON = {
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
   
-  // Точная копия иконки
-  dumbbell: `<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="16" y="28" width="32" height="8" rx="4" fill="var(--accent)"/>
-    <path d="M 12 16 C 16 16 20 20 20 24 L 20 40 C 20 44 16 48 12 48 C 8 48 4 44 4 40 L 4 24 C 4 20 8 16 12 16 Z" fill="var(--accent)"/>
-    <path d="M 52 16 C 56 16 60 20 60 24 L 60 40 C 60 44 56 48 52 48 C 48 48 44 44 44 40 L 44 24 C 44 20 48 16 52 16 Z" fill="var(--accent)"/>
-    <circle cx="12" cy="32" r="5" fill="var(--bg)"/>
-    <circle cx="52" cy="32" r="5" fill="var(--bg)"/>
+  // ИДЕАЛЬНАЯ КОПИЯ ИКОНКИ ИЗ ФОТО 1/2
+  dumbbell: `<svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10" y="28" width="30" height="44" rx="15" fill="var(--accent)"/>
+    <rect x="3" y="42" width="44" height="16" rx="8" fill="var(--accent)"/>
+    <circle cx="25" cy="50" r="7" fill="var(--bg)"/>
+    <rect x="60" y="28" width="30" height="44" rx="15" fill="var(--accent)"/>
+    <rect x="53" y="42" width="44" height="16" rx="8" fill="var(--accent)"/>
+    <circle cx="75" cy="50" r="7" fill="var(--bg)"/>
+    <rect x="25" y="42" width="50" height="16" rx="8" fill="var(--accent)"/>
   </svg>`
 };
 
