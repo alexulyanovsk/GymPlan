@@ -1,7 +1,7 @@
 /**
  * Файл: js/bridge.js
- * Версия: 1.4.0
- * Описание: Кастомные модальные окна вместо стандартных alert/confirm.
+ * Версия: 2.0.0
+ * Описание: Удалена светлая тема. Приложение всегда темное.
  */
 
 export const tg = window.WebApp || window.Telegram?.WebApp;
@@ -26,7 +26,6 @@ export function uiConfirm(msg) {
       try { tg.showConfirm(msg, done); return; } catch(_) {}
     }
     
-    // Кастомный UI
     const overlay = document.createElement('div');
     overlay.className = 'modal-backdrop';
     overlay.style.zIndex = '9999';
@@ -53,7 +52,6 @@ export function uiConfirm(msg) {
 export function uiAlert(msg) {
   if (IS_MAX && tg?.showAlert) { try { tg.showAlert(msg); return; } catch(_) {} }
   
-  // Кастомный UI
   const overlay = document.createElement('div');
   overlay.className = 'modal-backdrop';
   overlay.style.zIndex = '9999';
@@ -102,26 +100,21 @@ export function closeApp() {
 
 export function applyTheme() {
   const root = document.documentElement;
-  const isLight = tg?.colorScheme === 'light';
-  if (isLight) {
-    root.style.setProperty('--bg', '#F2F2F7'); 
-    root.style.setProperty('--surface', '#FFFFFF');
-    root.style.setProperty('--surface-hover', '#F9F9FB');
-    root.style.setProperty('--text-main', '#000000');
-    root.style.setProperty('--text-muted', '#8E8E93');
-    root.style.setProperty('--border', '1px solid rgba(0, 0, 0, 0.08)');
-    try { tg?.setHeaderColor?.('#F2F2F7'); tg?.setBackgroundColor?.('#F2F2F7'); } catch(_) {}
-  } else {
-    root.style.setProperty('--bg', '#09090B');
-    root.style.setProperty('--surface', '#141417');
-    root.style.setProperty('--surface-hover', '#1C1C21');
-    root.style.setProperty('--text-main', '#FFFFFF');
-    root.style.setProperty('--text-muted', '#8E8E93');
-    root.style.setProperty('--border', '1px solid rgba(255, 255, 255, 0.08)');
-    try { tg?.setHeaderColor?.('#09090B'); tg?.setBackgroundColor?.('#09090B'); } catch(_) {}
-  }
+  // Всегда жестко фиксируем темную тему (без проверки colorScheme)
+  root.style.setProperty('--bg', '#09090B');
+  root.style.setProperty('--surface', '#141417');
+  root.style.setProperty('--surface-hover', '#1C1C21');
+  root.style.setProperty('--text-main', '#FFFFFF');
+  root.style.setProperty('--text-muted', '#8E8E93');
+  root.style.setProperty('--border', '1px solid rgba(255, 255, 255, 0.08)');
+  try { tg?.setHeaderColor?.('#09090B'); tg?.setBackgroundColor?.('#09090B'); } catch(_) {}
 }
 
 if (tg) {
-  try { tg.ready?.(); tg.expand?.(); applyTheme(); tg.onEvent?.('themeChanged', applyTheme); } catch(_) {}
+  try { 
+    tg.ready?.(); 
+    tg.expand?.(); 
+    applyTheme(); 
+    // Убрали слушатель tg.onEvent('themeChanged'), так как тема теперь всегда одна
+  } catch(_) {}
 }
