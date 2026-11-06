@@ -1,5 +1,4 @@
 :root {
-  /* Новая палитра 2027 */
   --bg: #09090B;
   --surface: #141417;
   --surface-hover: #1C1C21;
@@ -21,16 +20,35 @@
 html, body {
   margin: 0; padding: 0;
   background-color: var(--bg);
-  /* Едва заметный шум для премиальной фактуры */
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
   color: var(--text-main);
   font-family: 'Manrope', -apple-system, sans-serif;
-  font-size: 16px; line-height: 1.4; min-height: 100vh;
+  font-size: 16px; line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  height: 100%;
+  overflow: hidden;
 }
 
 body.modal-open { overflow: hidden; }
-#app { padding: 20px; padding-bottom: max(100px, calc(env(safe-area-inset-bottom) + 100px)); max-width: 600px; margin: 0 auto; position: relative; z-index: 1; }
+
+#app { 
+  max-width: 600px; 
+  margin: 0 auto; 
+  padding: 0 20px; 
+  position: relative; 
+  z-index: 1; 
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: max(20px, env(safe-area-inset-top)); 
+  padding-bottom: max(16px, env(safe-area-inset-bottom)); 
+}
+
+#app.layout-library, #app.layout-history, #app.layout-dayEdit {
+  overflow-y: auto;
+  display: block;
+  padding-bottom: max(40px, calc(env(safe-area-inset-bottom) + 40px)); 
+}
 
 h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 0 0 8px 0; }
 h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
@@ -41,33 +59,46 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
 /* --- Кнопки --- */
 .btn { 
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  width: 100%; padding: 18px; border: none; border-radius: var(--radius-md); 
-  font-size: 17px; font-weight: 700; cursor: pointer; font-family: inherit; 
+  width: 100%; padding: 16px; border: none; border-radius: var(--radius-md); 
+  font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; 
   transition: transform 0.2s var(--spring), background 0.2s, opacity 0.15s; 
 }
 .btn:active { transform: scale(0.96); opacity: 0.9; }
 .btn:disabled { opacity: 0.4; cursor: default; transform: none; }
 .btn-primary { background: var(--accent); color: var(--accent-text); }
 .btn-secondary { background: var(--surface); color: var(--text-main); border: var(--border); }
-.btn-small { padding: 12px 16px; font-size: 15px; border-radius: var(--radius-sm); }
+.btn-small { padding: 10px 14px; font-size: 14px; border-radius: var(--radius-sm); }
 .btn-danger { background: rgba(255,69,58,0.1); color: var(--danger); border: 1px solid rgba(255,69,58,0.3); }
 
-/* --- Bento Grid (Главный экран) --- */
+/* --- Главный экран (Menu) --- */
+.menu-header { flex-shrink: 0; margin-bottom: 16px; }
+.menu-scroll-area { 
+  flex: 1; 
+  overflow-y: auto; 
+  min-height: 0; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 12px;
+  margin-bottom: 16px;
+  scrollbar-width: none;
+}
+.menu-scroll-area::-webkit-scrollbar { display: none; }
+.menu-footer { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+
 .bento-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 24px;
 }
 .bento-card {
   background: var(--surface);
   border: var(--border);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 130px;
+  min-height: 110px;
   transition: transform 0.2s var(--spring), background 0.2s;
   cursor: pointer;
   text-align: left;
@@ -75,47 +106,70 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
   font-family: inherit;
 }
 .bento-card:active { transform: scale(0.95); background: var(--surface-hover); }
-.bento-card.full-width { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; min-height: 80px; }
-.bento-day-num { font-size: 40px; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 8px; }
-.bento-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.bento-card.full-width { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; min-height: 72px; }
+.bento-day-num { font-size: 36px; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 8px; }
+.bento-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
 .bento-sub { font-size: 13px; color: var(--text-muted); }
 
-.quick-start { border-color: var(--accent); background: rgba(204, 255, 0, 0.05); }
+.quick-start { border: 1px solid var(--accent); background: rgba(204, 255, 0, 0.08); }
 .quick-start .bento-title { color: var(--accent); }
 
-/* --- Экран тренировки --- */
-.progress-label { font-size: 13px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-.ex-title { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; line-height: 1.2; }
-.ex-meta { font-size: 15px; color: var(--text-muted); margin-bottom: 20px; font-weight: 500; }
+.menu-grid-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-.gif-block { position: relative; width: 100%; height: 240px; background: var(--surface); border-radius: var(--radius-md); margin-bottom: 20px; overflow: hidden; display: flex; justify-content: center; align-items: center; border: var(--border); }
-.gif-block img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+/* --- Экран тренировки (Workout) --- */
+.workout-header { flex-shrink: 0; }
+.workout-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; margin-bottom: 12px; }
+.workout-footer { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.progress-label { font-size: 13px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.ex-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; line-height: 1.2; }
+.ex-meta { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+
+.gif-block { 
+  position: relative; width: 100%; 
+  flex: 1; min-height: 100px; max-height: 200px;
+  background: var(--surface); border-radius: var(--radius-md); 
+  margin: 12px 0; overflow: hidden; display: flex; 
+  justify-content: center; align-items: center; border: var(--border); 
+}
+.gif-block img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
 .gif-placeholder { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 64px; pointer-events: none; }
 .gif-block.no-gif .gif-placeholder { display: flex; }
 
-.note-block { border-left: 3px solid var(--accent); padding: 12px 16px; background: var(--surface); font-size: 14px; color: var(--text-main); margin-bottom: 20px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-weight: 500; }
-.hint-block { background: rgba(204, 255, 0, 0.1); border: 1px solid rgba(204, 255, 0, 0.2); padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; color: var(--accent); font-weight: 700; margin-bottom: 20px; }
-.last-block { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; font-weight: 500; }
+.note-block { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface); font-size: 13px; color: var(--text-main); margin-bottom: 12px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-weight: 500; }
+.hint-block { background: rgba(204, 255, 0, 0.1); border: 1px solid rgba(204, 255, 0, 0.2); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; color: var(--accent); font-weight: 700; margin-bottom: 12px; }
+.last-block { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; font-weight: 500; }
 
-/* --- Гигантские цифры и контролы --- */
-.set-counter { text-align: center; font-size: 15px; color: var(--text-muted); margin: 24px 0 16px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-.controls-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; background: var(--surface); padding: 16px; border-radius: var(--radius-lg); border: var(--border); }
-.circle-btn { width: 64px; height: 64px; border-radius: 50%; background: var(--bg); border: var(--border); color: var(--text-main); font-size: 24px; font-weight: 400; cursor: pointer; font-family: inherit; flex-shrink: 0; transition: all 0.2s var(--spring); display: flex; align-items: center; justify-content: center; }
+.set-counter { text-align: center; font-size: 12px; color: var(--text-muted); margin: 12px 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+.controls-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; background: var(--surface); padding: 10px 16px; border-radius: var(--radius-lg); border: var(--border); flex-shrink: 0; }
+
+.circle-btn { 
+  width: 48px; height: 48px; border-radius: 50%; 
+  background: var(--surface-hover); border: var(--border); color: var(--text-main); 
+  font-size: 20px; font-weight: 400; cursor: pointer; font-family: inherit; 
+  flex-shrink: 0; transition: all 0.2s var(--spring); 
+  display: flex; align-items: center; justify-content: center; 
+}
 .circle-btn:active { background: var(--accent); color: var(--accent-text); transform: scale(0.9); border-color: var(--accent); }
 
 .value-display { text-align: center; flex: 1; display: flex; flex-direction: column; align-items: center; }
-.value-input { font-size: 64px; font-weight: 800; color: var(--text-main); background: transparent; border: none; text-align: center; width: 100%; font-family: inherit; padding: 0; outline: none; appearance: none; -webkit-appearance: none; letter-spacing: -2px; font-variant-numeric: tabular-nums; line-height: 1; }
-.value-input:focus { color: var(--accent); }
+.value-input { 
+  font-size: 48px; font-weight: 800; color: var(--accent); 
+  background: transparent; border: none; text-align: center; width: 100%; 
+  font-family: inherit; padding: 0; outline: none; appearance: none; -webkit-appearance: none; 
+  letter-spacing: -1px; font-variant-numeric: tabular-nums; line-height: 1; 
+}
+.value-input:focus { color: var(--text-main); }
 .value-input::-webkit-outer-spin-button, .value-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .value-input[type=number] { -moz-appearance: textfield; }
-.value-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.value-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
 
-.note-input { width: 100%; padding: 16px; background: var(--surface); color: var(--text-main); border: var(--border); border-radius: var(--radius-md); font-size: 16px; font-family: inherit; outline: none; resize: vertical; min-height: 60px; margin-bottom: 24px; transition: border-color 0.2s; }
+.note-input { width: 100%; padding: 12px 16px; background: var(--surface); color: var(--text-main); border: var(--border); border-radius: var(--radius-md); font-size: 15px; font-family: inherit; outline: none; margin-bottom: 8px; transition: border-color 0.2s; height: 44px; flex-shrink: 0; }
 .note-input:focus { border-color: var(--accent); }
 
 /* --- Модалки (Bottom Sheets) --- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
-.modal { padding: 24px; width: 100%; max-width: 500px; max-height: 85vh; max-height: 85dvh; overflow-y: auto; background: var(--surface); border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-top: var(--border); animation: slideUp 0.3s var(--spring); }
+.modal { padding: 24px; width: 100%; max-width: 500px; max-height: 85vh; max-height: 85dvh; overflow-y: auto; background: var(--surface); border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-top: var(--border); animation: slideUp 0.3s var(--spring); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 .modal-day-btn { display: flex; width: 100%; padding: 16px; background: var(--bg); color: var(--text-main); border: var(--border); border-radius: var(--radius-md); margin-bottom: 10px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; font-family: inherit; justify-content: space-between; align-items: center; transition: border-color 0.2s; }
@@ -134,6 +188,14 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
 .chip { padding: 10px 18px; border-radius: 100px; background: var(--surface); border: var(--border); color: var(--text-muted); font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; font-family: inherit; flex-shrink: 0; transition: all 0.2s; }
 .chip.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .chip:active { transform: scale(0.95); }
+
+/* Стили для исключенных групп */
+.chip.excluded {
+  background: rgba(255, 69, 58, 0.1);
+  border-color: rgba(255, 69, 58, 0.3);
+  color: var(--danger);
+  text-decoration: line-through;
+}
 
 .lib-group-title { font-size: 13px; font-weight: 800; color: var(--accent); margin: 24px 0 12px 8px; text-transform: uppercase; letter-spacing: 1.5px; }
 .lib-item { padding: 16px; margin-bottom: 10px; background: var(--surface); border: var(--border); border-radius: var(--radius-md); cursor: pointer; transition: transform 0.2s, border-color 0.2s; }
@@ -156,7 +218,7 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
 .ex-edit-btn.remove { color: var(--danger); border-color: rgba(255,69,58,0.2); background: rgba(255,69,58,0.05); }
 
 /* --- Верхняя панель --- */
-.top-bar { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+.top-bar { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; gap: 16px; }
 .close-btn { background: var(--surface); border: var(--border); color: var(--text-muted); width: 44px; height: 44px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
 .close-btn:active { background: var(--surface-hover); color: var(--text-main); transform: scale(0.9); }
 
@@ -166,9 +228,9 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
 /* --- Таймер отдыха --- */
 .rest-overlay { position: fixed; inset: 0; background: rgba(9,9,11,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .rest-label-top { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 3px; font-weight: 800; margin-bottom: 16px; }
-.rest-countdown { font-size: 140px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -4px; }
+.rest-countdown { font-size: 120px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -4px; }
 .rest-label-bottom { font-size: 16px; color: var(--text-muted); margin-top: 16px; font-weight: 500; }
-.rest-buttons { display: flex; gap: 16px; margin-top: 48px; }
+.rest-buttons { display: flex; gap: 16px; margin-top: 40px; }
 .rest-btn { padding: 16px 32px; border-radius: 100px; background: var(--surface); border: var(--border); color: var(--text-main); font-size: 18px; font-weight: 700; cursor: pointer; font-family: inherit; min-width: 90px; transition: all 0.2s var(--spring); }
 .rest-btn:active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); transform: scale(0.95); }
 .rest-skip { margin-top: 32px; background: transparent; border: none; color: var(--text-muted); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; padding: 12px; }
