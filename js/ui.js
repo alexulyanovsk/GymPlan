@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 3.4.0
- * Описание: Исправлена логика чипов групп мышц (зеленый = выбрано).
+ * Версия: 3.5.0
+ * Описание: Точная SVG-гантель. Умный быстрый старт. Темные завершенные дни.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -32,7 +32,17 @@ const ICON = {
   trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
-  dumbbell: `<svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="40" width="60" height="20" rx="10" fill="var(--accent)"/><rect x="10" y="30" width="15" height="40" rx="7.5" fill="var(--accent)"/><rect x="75" y="30" width="15" height="40" rx="7.5" fill="var(--accent)"/><circle cx="30" cy="50" r="8" fill="var(--bg)"/><circle cx="70" cy="50" r="8" fill="var(--bg)"/></svg>`
+  
+  // Точная копия иконки (с перекладиной и вертикальными блинами)
+  dumbbell: `<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="20" y="28" width="24" height="8" rx="4" fill="var(--accent)"/>
+    <rect x="12" y="18" width="12" height="28" rx="6" fill="var(--accent)"/>
+    <rect x="40" y="18" width="12" height="28" rx="6" fill="var(--accent)"/>
+    <circle cx="18" cy="32" r="10" fill="var(--accent)"/>
+    <circle cx="46" cy="32" r="10" fill="var(--accent)"/>
+    <circle cx="18" cy="32" r="4" fill="var(--bg)"/>
+    <circle cx="46" cy="32" r="4" fill="var(--bg)"/>
+  </svg>`
 };
 
 export function handleBack() {
@@ -210,16 +220,29 @@ function renderMenu() {
   let daysHtml = '';
   Object.entries(state.plans).forEach(([id, d], idx) => {
     const c = d.exercises.length; const s = c === 1 ? 'упражнение' : c < 5 ? 'упражнения' : 'упражнений';
-    daysHtml += `<button class="bento-card" data-action="beginWorkout" data-id="${e(id)}">
-      <div class="bento-day-num">0${idx + 1}</div>
+    
+    // Проверяем, завершен ли этот день (если последняя тренировка была этим днем)
+    const isCompleted = state.history.length > 0 && state.history[0].dayId === id && state.lastCompletedTs > 0;
+    // Активен ли он прямо сейчас
+    const isActive = state.workout && state.workout.dayId === id;
+
+    const numClass = isCompleted && !isActive ? 'text-muted' : 'text-accent';
+    const cardClass = isCompleted && !isActive ? 'completed' : '';
+    const subText = isCompleted && !isActive ? `${c} ${s} · Выполнено` : `${c} ${s}`;
+
+    daysHtml += `<button class="bento-card ${cardClass}" data-action="beginWorkout" data-id="${e(id)}">
+      <div class="bento-day-num ${numClass}">0${idx + 1}</div>
       <div>
         <div class="bento-title">${e(d.title.split('·')[1]?.trim() || d.title)}</div>
-        <div class="bento-sub">${c} ${s}</div>
+        <div class="bento-sub">${subText}</div>
       </div>
     </button>`;
   });
 
-  const canResume = state.workout && state.plans[state.workout.dayId];
+  // Показываем "Быстрый старт" / "Продолжить" ТОЛЬКО если есть реальные подходы
+  const hasProgress = state.workout && (state.workout.tempSets.length > 0 || state.workout.results.length > 0);
+  const canResume = hasProgress && state.plans[state.workout.dayId];
+  
   const resumeBtn = canResume ? `<button class="bento-card full-width quick-start" data-action="resumeWorkout">
       <div style="color:var(--accent);">${ICON.play}</div>
       <div>
@@ -229,7 +252,7 @@ function renderMenu() {
     </button>` : '';
 
   const lastDay = state.currentDayId ? state.plans[state.currentDayId] : null;
-  const qs = !canResume && lastDay
+  const qs = !canResume && lastDay && !(state.history.length > 0 && state.history[0].dayId === lastDay.id)
     ? `<button class="bento-card full-width quick-start" data-action="beginWorkout" data-id="${e(state.currentDayId)}">
         <div style="color:var(--accent);">${ICON.play}</div>
         <div>
@@ -481,8 +504,6 @@ function renderNewDayDialog() {
 
 function renderGeneratorDialog() {
   const groups = ['Грудь', 'Спина', 'Плечи', 'Руки', 'Ноги'];
-  
-  // Логика: если группа НЕ в excludedGroups, значит она выбрана (активна, зеленая)
   const groupChips = groups.map(g => {
     const isExcluded = generatorOptions.excludedGroups.includes(g);
     return `<button class="chip ${!isExcluded ? 'active' : ''}" data-action="genToggleExclude" data-val="${g}">${g}</button>`;
@@ -704,6 +725,15 @@ function finishWorkout() {
 }
 
 async function cancelWorkout() {
+  const w = state.workout;
+  // Если нет выполненных подходов, выходим без вопросов
+  if (w && w.tempSets.length === 0 && w.results.length === 0) {
+    state.workout = null; state.screen = 'menu'; state.rest = null;
+    disableCloseConfirm();
+    lastSyncKey = ''; prevRenderKey = '';
+    saveState(); render();
+    return;
+  }
   const ok = await uiConfirm('Прервать тренировку? Данные сессии будут потеряны.');
   if (!ok) return;
   state.workout = null; state.screen = 'menu'; state.rest = null;
@@ -769,11 +799,9 @@ function toggleEq(el) {
 function toggleExcludeGroup(el) {
   const val = el.dataset.val;
   if (generatorOptions.excludedGroups.includes(val)) {
-    // Если группа была исключена, возвращаем её (делаем зеленой)
     generatorOptions.excludedGroups = generatorOptions.excludedGroups.filter(g => g !== val);
     el.classList.add('active');
   } else {
-    // Если группа была выбрана, исключаем её (делаем черной)
     generatorOptions.excludedGroups.push(val);
     el.classList.remove('active');
   }
