@@ -1,9 +1,9 @@
 /**
  * Файл: js/ui.js
- * Версия: 12.0.0
- * Описание: точечный update в doneSet (GIF не перезапускается),
+ * Версия: 12.1.0
+ * Описание: Финальная сборка. Точечный update в doneSet (GIF не перезапускается),
  *           scroll через #app.scrollTop, libFilter сохраняется,
- *           getExScheme/startValues/progressionHint с dayId.
+ *           кнопка "Завершить тренировку" на последнем упражнении.
  */
 
 import {
@@ -203,12 +203,15 @@ function refreshWorkoutUI() {
     sc.textContent = `Подход ${w.tempSets.length + 1}${allDone ? ` (сверх плана: ${extra + 1})` : ` из ${ex.sets}`}`;
   }
 
+  const isLastEx = w.exIdx >= day.exercises.length - 1;
   const mainBtn = document.querySelector('.workout-footer .btn-primary');
   if (mainBtn) {
     mainBtn.dataset.action = allDone ? 'advanceExercise' : 'doneSet';
-    mainBtn.textContent = allDone
-      ? `Следующее упражнение${extra > 0 ? ` (${w.tempSets.length})` : ''}`
-      : 'Подход выполнен';
+    if (allDone) {
+      mainBtn.textContent = isLastEx ? `Завершить тренировку${extra > 0 ? ` (${w.tempSets.length})` : ''}` : `Следующее упражнение${extra > 0 ? ` (${w.tempSets.length})` : ''}`;
+    } else {
+      mainBtn.textContent = 'Подход выполнен';
+    }
   }
 
   const extraBtnSelector = '.workout-footer .btn-secondary[data-action="doneSet"]';
@@ -223,7 +226,6 @@ function refreshWorkoutUI() {
     extraBtn.remove();
   }
 
-  // Заметка обновляется вручную через input — не трогаем
   syncTelegramUI();
 }
 
@@ -394,8 +396,14 @@ function renderWorkout() {
       <button class="circle-btn" data-action="incW">+</button>
     </div>`;
 
+  const isLastEx = w.exIdx >= day.exercises.length - 1;
   const primaryAction = allDone ? 'advanceExercise' : 'doneSet';
-  const primaryLabel = allDone ? `Следующее упражнение${extra > 0 ? ` (${w.tempSets.length})` : ''}` : 'Подход выполнен';
+  let primaryLabel;
+  if (allDone) {
+    primaryLabel = isLastEx ? `Завершить тренировку${extra > 0 ? ` (${w.tempSets.length})` : ''}` : `Следующее упражнение${extra > 0 ? ` (${w.tempSets.length})` : ''}`;
+  } else {
+    primaryLabel = 'Подход выполнен';
+  }
   const extraBtn = allDone ? `<button class="btn btn-secondary btn-small" data-action="doneSet">+ Ещё подход</button>` : '';
 
   return `
