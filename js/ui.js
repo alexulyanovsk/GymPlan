@@ -862,4 +862,326 @@ async function cancelWorkout() {
 
 export function goMenu() {
   state.screen = 'menu';
-  state.pendingAdd = null; state.newDayOpen = false;
+  state.pendingAdd = null; state.newDayOpen = false; state.generatorOpen = false; state.rest = null;
+  state.editingDayId = null; state.pickForDayId = null;
+  disableCloseConfirm();
+  lastSyncKey = ''; prevRenderKey = '';
+  saveState(); render();
+}
+
+function openLibrary() { state.screen = 'library'; state.pickForDayId = null; saveState(); render(); }
+function openHistory() { state.screen = 'history'; saveState(); render(); }
+function openNewDay() {
+  state.newDayOpen = true; state.newDayName = ''; saveState(); render();
+  setTimeout(() => { $('newDayNameInput')?.focus(); }, 100);
+}
+function closeNewDay() { state.newDayOpen = false; state.newDayName = ''; render(); }
+
+function openGenerator() { state.generatorOpen = true; saveState(); render(); }
+function closeGenerator() { state.generatorOpen = false; saveState(); render(); }
+
+function toggleEq(el) {
+  const val = el.dataset.val;
+  if (val === 'all') {
+    generatorOptions.equipment = ['all'];
+    document.querySelectorAll('[data-action="genToggleEq"]').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === 'all');
+    });
+  } else {
+    generatorOptions.equipment = generatorOptions.equipment.filter(x => x !== 'all');
+    if (generatorOptions.equipment.includes(val)) {
+      generatorOptions.equipment = generatorOptions.equipment.filter(x => x !== val);
+      el.classList.remove('active');
+    } else {
+      generatorOptions.equipment.push(val);
+      el.classList.add('active');
+    }
+    if (generatorOptions.equipment.length === 0) {
+      generatorOptions.equipment = ['all'];
+      document.querySelector('[data-action="genToggleEq"][data-val="all"]')?.classList.add('active');
+    } else {
+      document.querySelector('[data-action="genToggleEq"][data-val="all"]')?.classList.remove('active');
+    }
+  }
+}
+
+function toggleExcludeGroup(el) {
+  const val = el.dataset.val;
+  if (generatorOptions.excludedGroups.includes(val)) {
+    generatorOptions.excludedGroups = generatorOptions.excludedGroups.filter(g => g !== val);
+    el.classList.add('active');
+  } else {
+    generatorOptions.excludedGroups.push(val);
+    el.classList.remove('active');
+  }
+}
+
+async function applyGeneratedPlan() {
+  if (state.workout && state.workout.dayId && state.workout.dayId.startsWith('gen_')) {
+    const ok = await uiConfirm('Активная тренировка будет прервана. Продолжить?');
+    if (!ok) return;
+    state.workout = null; state.rest = null; state.screen = 'menu';
+    disableCloseConfirm();
+  }
+
+  const newPlans = generatePlan({
+    goal: generatorOptions.goal,
+    exp: generatorOptions.exp,
+    daysPerWeek: generatorOptions.days,
+    equipment: generatorOptions.equipment,
+    excludedGroups: generatorOptions.excludedGroups
+  });
+
+  if (!newPlans) {
+    uiAlert('Недостаточно групп или оборудования. Выберите больше вариантов.');
+    return;
+  }
+
+  for (const id of Object.keys(state.plans)) {
+    if (id.startsWith('gen_')) delete state.plans[id];
+  }
+  Object.assign(state.plans, newPlans);
+  state.generatorOpen = false;
+  invalidatePlanCaches();
+  saveState(); render();
+  hapticNotify('success');
+  uiAlert('Ваш план готов! Приятных тренировок.');
+}
+
+function exitLibrary() {
+  if (state.pickForDayId) { state.pickForDayId = null; state.screen = 'dayEdit'; }
+  else { state.screen = 'menu'; }
+  prevRenderKey = ''; saveState(); render();
+}
+
+function editDay(id) {
+  if (!state.plans[id]) return;
+  if (isActiveDay(id)) { uiAlert('Нельзя редактировать день с активной тренировкой'); return; }
+  state.editingDayId = id; state.screen = 'dayEdit'; saveState(); render();
+}
+function closeDayEdit() { state.editingDayId = null; state.pickForDayId = null; state.screen = 'menu'; prevRenderKey = ''; saveState(); render(); }
+function addExFromDayEdit() {
+  if (!state.editingDayId) return;
+  if (isActiveDay(state.editingDayId)) { uiAlert('День активен'); return; }
+  state.pickForDayId = state.editingDayId;
+  state.screen = 'library';
+  state.libSearch = '';
+  saveState(); render();
+}
+function moveExercise(dayId, idx, dir) {
+  const d = state.plans[dayId]; if (!d) return;
+  if (isActiveDay(dayId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= d.exercises.length) return;
+  [d.exercises[idx], d.exercises[newIdx]] = [d.exercises[newIdx], d.exercises[idx]];
+  invalidatePlanCaches(); saveState(); render();
+}
+function removeExFromDayEdit(dayId, idx) {
+  const d = state.plans[dayId]; if (!d) return;
+  if (isActiveDay(dayId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
+  const removed = d.exercises[idx];
+  d.exercises.splice(idx, 1);
+  if (d.schemes && removed && d.schemes[removed]) delete d.schemes[removed];
+  invalidatePlanCaches(); saveState(); render();
+}
+async function deleteDay(id) {
+  const d = state.plans[id]; if (!d) return;
+  if (isActiveDay(id)) { uiAlert('Нельзя удалить день с активной тренировкой'); return; }
+  const ok = await uiConfirm(`Удалить день "${d.title}"?`);
+  if (!ok) return;
+  delete state.plans[id];
+  if (state.currentDayId === id) state.currentDayId = null;
+  if (state.editingDayId === id) state.editingDayId = null;
+  invalidatePlanCaches();
+  state.screen = 'menu'; prevRenderKey = '';
+  saveState(); render();
+}
+
+function createNewDay() {
+  const i = $('newDayNameInput'), n = (i?.value || state.newDayName || '').trim().slice(0, 50);
+  if (!n) { uiAlert('Введите название'); return; }
+  const id = 'custom_' + Date.now();
+  state.plans[id] = { title: n, exercises: [], schemes: {} };
+  state.newDayOpen = false; state.newDayName = '';
+  state.editingDayId = id; state.screen = 'dayEdit';
+  invalidatePlanCaches(); prevRenderKey = '';
+  saveState(); render();
+}
+
+function pickExercise(exId) {
+  if (!EXERCISES[exId]) return;
+  if (state.pendingAdd) return;
+  if (state.pickForDayId) {
+    const day = state.plans[state.pickForDayId];
+    if (day && !day.exercises.includes(exId)) {
+      if (isActiveDay(state.pickForDayId)) { uiAlert('День активен'); return; }
+      day.exercises.push(exId);
+    }
+    state.pickForDayId = null; state.screen = 'dayEdit';
+    invalidatePlanCaches(); prevRenderKey = '';
+    saveState(); render();
+    return;
+  }
+  state.pendingAdd = { exId }; render();
+}
+function addExToDay(dId, exId) {
+  const d = state.plans[dId];
+  if (isActiveDay(dId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
+  if (d && EXERCISES[exId] && !d.exercises.includes(exId)) d.exercises.push(exId);
+  state.pendingAdd = null; invalidatePlanCaches(); saveState(); render();
+}
+function removeExFromDay(dId, exId) {
+  const d = state.plans[dId];
+  if (isActiveDay(dId)) { uiAlert('День активен, сначала завершите тренировку'); return; }
+  if (d) {
+    d.exercises = d.exercises.filter(x => x !== exId);
+    if (d.schemes) delete d.schemes[exId];
+  }
+  state.pendingAdd = null; invalidatePlanCaches(); saveState(); render();
+}
+function closeAddDialog() { state.pendingAdd = null; render(); }
+
+function adjustWeight(d) {
+  const w = state.workout; if (!w) return;
+  w.currentWeight = Math.max(0, Math.round((w.currentWeight + d) * 10) / 10);
+  const i = $('wInput'); if (i) i.value = w.currentWeight;
+  saveState();
+}
+function adjustReps(d) {
+  const w = state.workout; if (!w) return;
+  w.currentReps = Math.max(1, w.currentReps + d);
+  const i = $('rInput'); if (i) i.value = w.currentReps;
+  saveState();
+}
+
+function findNextDayId(cId) {
+  const ids = Object.keys(state.plans);
+  if (!ids.length) return null;
+  const idx = ids.indexOf(cId);
+  return idx < 0 ? ids[0] : ids[(idx + 1) % ids.length];
+}
+function goNextDay(id) {
+  state.workout = null; state.currentDayId = null; state.screen = 'menu';
+  lastSyncKey = ''; prevRenderKey = '';
+  saveState(); beginWorkout(id);
+}
+
+async function exportCsv() {
+  if (csvExportRunning) return;
+  if (!state.history.length) { uiAlert('История пуста'); return; }
+  csvExportRunning = true;
+  try {
+    let csv = 'Дата;День;Упражнение;Подход;Вес;Повторы;Заметка\n';
+    state.history.forEach(h => (h.exercises || []).forEach(r => {
+      if (!r || !Array.isArray(r.sets)) return;
+      const ex = EXERCISES[r.id];
+      const name = csvSafe(ex?.name || r.id || '').replace(/"/g, '""');
+      const note = csvSafe(r.note || '').replace(/"/g, '""');
+      const dayTitle = csvSafe(h.dayTitle || '').replace(/"/g, '""');
+      r.sets.forEach((s, i) => {
+        csv += `"${fd(h.ts)}";"${dayTitle}";"${name}";${i + 1};${s.weight};${s.reps};"${note}"\n`;
+      });
+    }));
+    const filename = 'gymplan_' + Date.now() + '.csv';
+
+    if (typeof File !== 'undefined' && navigator.canShare && navigator.share) {
+      try {
+        const file = new File(['\ufeff' + csv], filename, { type: 'text/csv;charset=utf-8' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'GymPlan export' });
+          return;
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') { showCsvModal(csv); return; }
+      }
+    }
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile) {
+      try {
+        const b = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(u), 1000);
+        return;
+      } catch (_) {}
+    }
+
+    try {
+      await navigator.clipboard.writeText(csv);
+      uiAlert('CSV скопирован в буфер обмена');
+      return;
+    } catch (_) {}
+    showCsvModal(csv);
+  } finally { csvExportRunning = false; }
+}
+
+export const ACTIONS = {
+  beginWorkout: el => beginWorkout(el.dataset.id),
+  resumeWorkout: () => {
+    if (state.workout) {
+      state.screen = 'workout';
+      enableCloseConfirm();
+      prevRenderKey = '';
+      saveState(); render();
+    }
+  },
+  doneSet: () => doneSet(),
+  advanceExercise: () => advanceExercise(),
+  skipExercise: () => skipExercise(),
+  cancelWorkout: () => cancelWorkout(),
+  goMenu: () => goMenu(),
+  openLibrary: () => openLibrary(),
+  exitLibrary: () => exitLibrary(),
+  openHistory: () => openHistory(),
+  openNewDay: () => openNewDay(),
+  closeNewDay: () => closeNewDay(),
+  createNewDay: () => createNewDay(),
+  openGenerator: () => openGenerator(),
+  closeGenerator: () => closeGenerator(),
+  generatePlanAction: () => applyGeneratedPlan(),
+  genSetGoal: el => { generatorOptions.goal = el.dataset.val; document.querySelectorAll('[data-action="genSetGoal"]').forEach(b => b.classList.toggle('active', b.dataset.val === el.dataset.val)); },
+  genSetExp: el => { generatorOptions.exp = el.dataset.val; document.querySelectorAll('[data-action="genSetExp"]').forEach(b => b.classList.toggle('active', b.dataset.val === el.dataset.val)); },
+  genSetDays: el => { generatorOptions.days = Number(el.dataset.val); document.querySelectorAll('[data-action="genSetDays"]').forEach(b => b.classList.toggle('active', b.dataset.val === el.dataset.val)); },
+  genToggleEq: el => toggleEq(el),
+  genToggleExclude: el => toggleExcludeGroup(el),
+  exportCsv: () => exportCsv(),
+  copyCsv: async () => {
+    if (!csvModalData) return;
+    try { await navigator.clipboard.writeText(csvModalData); uiAlert('Скопировано'); }
+    catch(_) { uiAlert('Не удалось скопировать'); }
+  },
+  closeCsvModal: () => { closeCsvModal(); render(); },
+  exportData: async () => { await exportData(); },
+  importData: () => { document.getElementById('importFile').click(); },
+  setFilter: el => {
+    state.libFilter = el.dataset.id;
+    saveState();
+    document.querySelectorAll('.chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.id === state.libFilter);
+    });
+    const list = $('libList');
+    if (list) list.innerHTML = renderLibraryList();
+    syncTelegramUI();
+  },
+  pickExercise: el => pickExercise(el.dataset.id),
+  addExToDay: el => addExToDay(el.dataset.day, el.dataset.ex),
+  removeExFromDay: el => removeExFromDay(el.dataset.day, el.dataset.ex),
+  closeAddDialog: () => closeAddDialog(),
+  nextDay: el => goNextDay(el.dataset.id),
+  restPlus: () => adjustRest(15),
+  restMinus: () => adjustRest(-15),
+  restSkip: () => skipRest(),
+  incW: () => adjustWeight(getCurrentEx()?.inc || 2.5),
+  decW: () => adjustWeight(-(getCurrentEx()?.inc || 2.5)),
+  incR: () => adjustReps(getCurrentEx()?.unit === 'свой вес' ? 5 : 1),
+  decR: () => adjustReps(getCurrentEx()?.unit === 'свой вес' ? -5 : -1),
+  editDay: el => editDay(el.dataset.id),
+  closeDayEdit: () => closeDayEdit(),
+  addExFromDayEdit: () => addExFromDayEdit(),
+  moveEx: el => moveExercise(el.dataset.day, Number(el.dataset.idx), Number(el.dataset.dir)),
+  removeExFromDayEdit: el => removeExFromDayEdit(el.dataset.day, Number(el.dataset.idx)),
+  deleteDay: el => deleteDay(el.dataset.id)
+};
