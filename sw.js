@@ -1,10 +1,10 @@
 /**
  * Файл: sw.js
- * Версия: 39.0.0
- * Описание: Исправлен fallback для навигации, проверка res.ok, безопасные catch.
+ * Версия: 40.0.0
+ * Описание: install через cache.addAll (атомарно). Если хоть один файл не закэширован — SW не активируется.
  */
 
-const CACHE_NAME = 'gymplan-v39';
+const CACHE_NAME = 'gymplan-v40';
 const APP_SHELL = [
   '/GymPlan/',
   '/GymPlan/index.html',
@@ -28,18 +28,11 @@ function safePut(cache, request, response) {
 }
 
 self.addEventListener('install', (e) => {
-  self.skipWaiting();
+  // Атомарный install: при фейле любого файла SW не активируется.
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      Promise.all(
-        APP_SHELL.map((url) =>
-          fetch(url, { cache: 'reload' }).then((res) => {
-            if (res.ok) return cache.put(url, res);
-          }).catch(() => {})
-        )
-      )
-    )
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
