@@ -30,6 +30,7 @@ html, body {
 }
 
 body.modal-open { overflow: hidden; }
+body.modal-open #app { overflow: hidden; }
 
 #app { 
   max-width: 600px; 
@@ -44,7 +45,7 @@ body.modal-open { overflow: hidden; }
   padding-bottom: max(16px, env(safe-area-inset-bottom)); 
 }
 
-#app.layout-library, #app.layout-history, #app.layout-dayEdit {
+#app.layout-library, #app.layout-history, #app.layout-dayEdit, #app.layout-complete {
   overflow-y: auto;
   display: block;
   padding-bottom: max(40px, calc(env(safe-area-inset-bottom) + 40px)); 
@@ -104,7 +105,7 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
   text-align: left;
   color: var(--text-main);
   font-family: inherit;
-  position: relative; /* Для карандаша */
+  position: relative;
 }
 .bento-card:active { transform: scale(0.95); background: var(--surface-hover); }
 .bento-card.full-width { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; min-height: 72px; }
@@ -120,7 +121,6 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
 .quick-start { border: 1px solid var(--accent); background: rgba(204, 255, 0, 0.08); }
 .quick-start .bento-title { color: var(--accent); }
 
-/* Карандаш */
 .day-edit-btn {
   position: absolute;
   top: 12px;
@@ -199,6 +199,7 @@ h3 { font-size: 20px; font-weight: 700; margin: 0 0 16px 0; }
 
 .modal-day-btn { display: flex; width: 100%; padding: 16px; background: var(--bg); color: var(--text-main); border: var(--border); border-radius: var(--radius-md); margin-bottom: 10px; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; font-family: inherit; justify-content: space-between; align-items: center; transition: border-color 0.2s; }
 .modal-day-btn:active { border-color: var(--accent); }
+.modal-day-btn:disabled { opacity: 0.5; cursor: default; }
 .modal-day-btn .remove-action { font-size: 13px; color: var(--danger); font-weight: 700; }
 .modal-day-btn .add-action { font-size: 13px; color: var(--accent); font-weight: 700; }
 .modal-input { width: 100%; padding: 16px; background: var(--bg); color: var(--text-main); border: var(--border); border-radius: var(--radius-md); font-size: 16px; font-family: inherit; outline: none; margin-bottom: 16px; transition: border-color 0.2s; }
