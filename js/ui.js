@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 3.7.0
- * Описание: Точная SVG-гантель. Исправлена верстка экрана тренировки.
+ * Версия: 3.9.0
+ * Описание: Идеальная SVG-гантель. Уменьшены панели ввода веса/повторов.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -33,15 +33,18 @@ const ICON = {
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
   
-  // ИДЕАЛЬНАЯ КОПИЯ ИКОНКИ ИЗ ФОТО 1/2
-  dumbbell: `<svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="10" y="28" width="30" height="44" rx="15" fill="var(--accent)"/>
-    <rect x="3" y="42" width="44" height="16" rx="8" fill="var(--accent)"/>
-    <circle cx="25" cy="50" r="7" fill="var(--bg)"/>
-    <rect x="60" y="28" width="30" height="44" rx="15" fill="var(--accent)"/>
-    <rect x="53" y="42" width="44" height="16" rx="8" fill="var(--accent)"/>
-    <circle cx="75" cy="50" r="7" fill="var(--bg)"/>
-    <rect x="25" y="42" width="50" height="16" rx="8" fill="var(--accent)"/>
+  // ИСПРАВЛЕНО: Перекладина сквозь блины, отверстия на пересечении
+  dumbbell: `<svg width="80" height="80" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Горизонтальная перекладина (торчит по бокам) -->
+    <rect x="5" y="44" width="90" height="12" rx="6" fill="var(--accent)"/>
+    <!-- Левый блин -->
+    <rect x="22" y="20" width="20" height="60" rx="10" fill="var(--accent)"/>
+    <!-- Правый блин -->
+    <rect x="58" y="20" width="20" height="60" rx="10" fill="var(--accent)"/>
+    <!-- Левые отверстия на пересечении -->
+    <circle cx="32" cy="50" r="7" fill="var(--bg)"/>
+    <!-- Правые отверстия на пересечении -->
+    <circle cx="68" cy="50" r="7" fill="var(--bg)"/>
   </svg>`
 };
 
@@ -192,12 +195,12 @@ function renderMenu() {
         <p class="dim small" style="font-weight:500; margin:0;">Умный трекер тренировок</p>
       </div>
       
-      <div class="menu-scroll-area" style="justify-content:center; align-items:center; text-align:center;">
-        <div style="margin-bottom:24px; opacity: 0.9;">
+      <div class="menu-scroll-area" style="justify-content:center; align-items:center; text-align:center; padding-bottom: 40px;">
+        <div style="margin-bottom: 32px; opacity: 0.9;">
           ${ICON.dumbbell}
         </div>
         <h2 style="font-size: 26px; font-weight: 800; margin-bottom:12px; letter-spacing: -0.5px;">Добро пожаловать!</h2>
-        <p class="dim" style="margin-bottom:32px; max-width:280px; font-weight:500; font-size: 15px;">
+        <p class="dim" style="margin-bottom:40px; max-width:280px; font-weight:500; font-size: 15px;">
           У вас пока нет плана. Позвольте нашему алгоритму создать идеальную программу под ваши цели и оборудование.
         </p>
         
