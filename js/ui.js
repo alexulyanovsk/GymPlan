@@ -1,13 +1,14 @@
 /**
  * Файл: js/ui.js
- * Версия: 2.0.0
- * Описание: Современный рендеринг (Bento Grid, SVG-иконки, крупная типографика).
+ * Версия: 3.0.0
+ * Описание: Value First Onboarding. Empty State с генератором.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
 import { M, EX_ENTRIES, EXERCISES, LIMITS } from './data.js';
 import { $, e, fn, pn, rs, ws, fd } from './utils.js';
 import { tg, haptic, hapticNotify, uiConfirm, uiAlert, enableCloseConfirm, disableCloseConfirm } from './bridge.js';
+import { generatePlan } from './generator.js';
 
 let restTicker = null;
 let lastMainBtnAt = 0;
@@ -15,8 +16,8 @@ let lastSyncKey = '';
 let prevRenderKey = '';
 let doneSetRunning = false;
 let csvExportRunning = false;
+let generatorOptions = { goal: 'hypertrophy', exp: 'intermediate', days: 4, equipment: ['barbell', 'dumbbell', 'machine'] };
 
-// --- SVG Иконки (Lucide Style) ---
 const ICON = {
   play: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
   book: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`,
@@ -24,18 +25,19 @@ const ICON = {
   plus: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
   upload: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
   download: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
-  edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
   x: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
   arrowRight: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>`,
   arrowUp: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>`,
   arrowDown: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>`,
   trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
-  check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+  check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+  sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`
 };
 
 export function handleBack() {
   if (state.pendingAdd) { closeAddDialog(); return true; }
   if (state.newDayOpen) { closeNewDay(); return true; }
+  if (state.generatorOpen) { closeGenerator(); return true; }
   if (state.screen === 'workout') { cancelWorkout(); return true; }
   if (state.screen === 'complete') { goMenu(); return true; }
   if (state.screen === 'dayEdit') { closeDayEdit(); return true; }
@@ -63,6 +65,8 @@ export function render() {
   const app = $('app');
   const scrollTop = window.scrollY;
   
+  app.className = `layout-${state.screen}`;
+
   if ($('csvModalBackdrop') && state.screen !== 'history') closeCsvModal();
 
   const activeEl = document.activeElement;
@@ -86,6 +90,7 @@ export function render() {
 
   document.getElementById('addDialogBackdrop')?.remove();
   document.getElementById('newDayDialogBackdrop')?.remove();
+  document.getElementById('generatorDialogBackdrop')?.remove();
 
   if (state.pendingAdd) {
     const dHtml = renderAddDialog();
@@ -94,10 +99,13 @@ export function render() {
   if (state.newDayOpen) {
     document.body.insertAdjacentHTML('beforeend', renderNewDayDialog());
   }
+  if (state.generatorOpen) {
+    document.body.insertAdjacentHTML('beforeend', renderGeneratorDialog());
+  }
 
-  document.body.classList.toggle('modal-open', !!state.pendingAdd || !!state.newDayOpen || !!$('csvModalBackdrop'));
+  document.body.classList.toggle('modal-open', !!state.pendingAdd || !!state.newDayOpen || !!state.generatorOpen || !!$('csvModalBackdrop'));
 
-  if (renderKey === prevRenderKey && scrollTop > 0) {
+  if (renderKey === prevRenderKey && scrollTop > 0 && ['library', 'history', 'dayEdit'].includes(state.screen)) {
     requestAnimationFrame(() => window.scrollTo(0, scrollTop));
   }
   prevRenderKey = renderKey;
@@ -163,9 +171,40 @@ function syncTelegramUI() {
   }
 }
 
-// --- ЭКРАНЫ ---
-
 function renderMenu() {
+  const hasPlans = Object.keys(state.plans).length > 0;
+
+  if (!hasPlans) {
+    return `
+      <div class="menu-header">
+        <h1>GymPlan</h1>
+        <p class="dim small" style="font-weight:500; margin:0;">Умный трекер тренировок</p>
+      </div>
+      
+      <div class="menu-scroll-area" style="justify-content:center; align-items:center; text-align:center;">
+        <div style="width:80px; height:80px; background:rgba(204,255,0,0.1); border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--accent); margin-bottom:24px;">
+          ${ICON.sparkles}
+        </div>
+        <h1 style="margin-bottom:12px;">Добро пожаловать!</h1>
+        <p class="dim" style="margin-bottom:32px; max-width:280px; font-weight:500;">
+          У вас пока нет плана. Позвольте нашему алгоритму создать идеальную программу под ваши цели и оборудование.
+        </p>
+        <button class="btn btn-primary" data-action="openGenerator" style="width:100%; max-width:300px;">
+          ${ICON.sparkles} Сгенерировать план
+        </button>
+        <button class="btn btn-secondary mt-10" data-action="openNewDay" style="width:100%; max-width:300px;">
+          ${ICON.plus} Создать вручную
+        </button>
+      </div>
+      
+      <div class="menu-footer">
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary btn-small" data-action="importData" style="flex:1; padding:12px;">${ICON.download} Импорт</button>
+        </div>
+      </div>
+    `;
+  }
+
   let daysHtml = '';
   Object.entries(state.plans).forEach(([id, d], idx) => {
     const c = d.exercises.length; const s = c === 1 ? 'упражнение' : c < 5 ? 'упражнения' : 'упражнений';
@@ -198,20 +237,29 @@ function renderMenu() {
       </button>` : '';
 
   return `
-    <h1>GymPlan</h1>
-    <p class="dim small" style="margin-bottom:24px; font-weight:500;">Сплит Push/Pull</p>
-    ${resumeBtn}
-    ${qs}
-    <div class="bento-grid">${daysHtml}</div>
+    <div class="menu-header">
+      <h1>GymPlan</h1>
+      <p class="dim small" style="font-weight:500; margin:0;">Ваша программа</p>
+    </div>
     
-    <div style="display:flex; flex-direction:column; gap:12px; margin-top:32px;">
-      <button class="btn btn-secondary" data-action="openLibrary">${ICON.book} Библиотека</button>
-      <button class="btn btn-secondary" data-action="openHistory">${ICON.chart} История</button>
-      <button class="btn btn-secondary" data-action="openNewDay">${ICON.plus} Новый день</button>
-      
-      <div style="display:flex; gap:12px; margin-top:8px;">
-        <button class="btn btn-secondary btn-small" data-action="exportData" style="flex:1">${ICON.upload} Экспорт</button>
-        <button class="btn btn-secondary btn-small" data-action="importData" style="flex:1">${ICON.download} Импорт</button>
+    <div class="menu-scroll-area">
+      ${resumeBtn}
+      ${qs}
+      <div class="bento-grid">${daysHtml}</div>
+    </div>
+    
+    <div class="menu-footer">
+      <div class="menu-grid-buttons">
+        <button class="btn btn-secondary" data-action="openLibrary">${ICON.book} Библиотека</button>
+        <button class="btn btn-secondary" data-action="openHistory">${ICON.chart} История</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button class="btn btn-primary" data-action="openGenerator" style="flex:1; padding:12px; background:rgba(204,255,0,0.1); color:var(--accent); border:1px solid var(--accent);">${ICON.sparkles} Генератор</button>
+        <button class="btn btn-secondary" data-action="openNewDay" style="flex:1; padding:12px;">${ICON.plus} Свой день</button>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <button class="btn btn-secondary btn-small" data-action="exportData" style="flex:1; padding:10px;">${ICON.upload} Экспорт</button>
+        <button class="btn btn-secondary btn-small" data-action="importData" style="flex:1; padding:10px;">${ICON.download} Импорт</button>
       </div>
     </div>
   `;
@@ -245,51 +293,53 @@ function renderWorkout() {
 
   const primaryAction = allDone ? 'advanceExercise' : 'doneSet';
   const primaryLabel = allDone ? `Следующее упражнение${extra > 0 ? ` (${w.tempSets.length})` : ''}` : 'Подход выполнен';
-  const extraBtn = allDone ? `<button class="btn btn-secondary btn-small mt-10" data-action="doneSet">+ Ещё подход</button>` : '';
+  const extraBtn = allDone ? `<button class="btn btn-secondary btn-small" data-action="doneSet">+ Ещё подход</button>` : '';
 
   return `
-    <div class="top-bar">
-      <div>
-        <div class="progress-label">Упражнение ${w.exIdx + 1} из ${day.exercises.length}</div>
-        <div class="ex-title">${e(ex.name)}</div>
-        <div class="ex-meta">${ex.sets} × ${rs(ex)} · старт: ${e(ws(ex))}</div>
+    <div class="workout-header">
+      <div class="top-bar" style="margin-bottom:0;">
+        <div>
+          <div class="progress-label">Упражнение ${w.exIdx + 1} из ${day.exercises.length}</div>
+          <div class="ex-title">${e(ex.name)}</div>
+          <div class="ex-meta">${ex.sets} × ${rs(ex)} · старт: ${e(ws(ex))}</div>
+        </div>
+        <button class="close-btn" data-action="cancelWorkout" aria-label="Выйти">${ICON.x}</button>
       </div>
-      <button class="close-btn" data-action="cancelWorkout" aria-label="Выйти">${ICON.x}</button>
     </div>
     
-    ${gifHtml}
-    <div class="note-block">${e(ex.note)}</div>
-    ${hintBlock}
-    ${lastBlock}
-    
-    <div class="set-counter">Подход ${w.tempSets.length + 1}${allDone ? ` (сверх плана: ${extra + 1})` : ` из ${ex.sets}`}</div>
-    
-    ${weightCtrls}
-    
-    <div class="controls-row">
-      <button class="circle-btn" data-action="decR">−</button>
-      <div class="value-display">
-        <input type="number" class="value-input" id="rInput" value="${rVal}" step="${isBW ? 5 : 1}" inputmode="numeric" autocomplete="off" aria-label="Повторы">
-        <div class="value-label">${isBW ? 'сек' : 'повт.'}</div>
-      </div>
-      <button class="circle-btn" data-action="incR">+</button>
+    <div class="workout-body">
+      ${gifHtml}
+      <div class="note-block">${e(ex.note)}</div>
+      ${hintBlock}
+      ${lastBlock}
     </div>
     
-    <textarea class="note-input" id="noteInput" maxlength="500" placeholder="Заметка к упражнению...">${e(w.currentNote || '')}</textarea>
-    
-    <button class="btn btn-primary" data-action="${primaryAction}">${primaryLabel}</button>
-    ${extraBtn}
-    <button class="btn btn-secondary btn-small mt-10" data-action="skipExercise">Пропустить упражнение</button>
+    <div class="workout-footer">
+      <div class="set-counter">Подход ${w.tempSets.length + 1}${allDone ? ` (сверх плана: ${extra + 1})` : ` из ${ex.sets}`}</div>
+      ${weightCtrls}
+      
+      <div class="controls-row">
+        <button class="circle-btn" data-action="decR">−</button>
+        <div class="value-display">
+          <input type="number" class="value-input" id="rInput" value="${rVal}" step="${isBW ? 5 : 1}" inputmode="numeric" autocomplete="off" aria-label="Повторы">
+          <div class="value-label">${isBW ? 'сек' : 'повт.'}</div>
+        </div>
+        <button class="circle-btn" data-action="incR">+</button>
+      </div>
+      
+      <input type="text" class="note-input" id="noteInput" maxlength="500" placeholder="Заметка к упражнению..." value="${e(w.currentNote || '')}">
+      
+      <button class="btn btn-primary" data-action="${primaryAction}">${primaryLabel}</button>
+      ${extraBtn}
+      <button class="btn btn-secondary btn-small mt-10" data-action="skipExercise">Пропустить упражнение</button>
+    </div>
   `;
 }
 
 function renderComplete() {
   const h = state.history[0];
   const isThisSession = h && h.ts === state.lastCompletedTs;
-  if (!h || !isThisSession) {
-    state.screen = 'menu';
-    return renderMenu();
-  }
+  if (!h || !isThisSession) { state.screen = 'menu'; return renderMenu(); }
   let summary = '';
   (h.exercises || []).forEach(r => {
     if (!r || !Array.isArray(r.sets)) return;
@@ -307,11 +357,9 @@ function renderComplete() {
       <h1 style="margin:0;">Готово!</h1>
       <p class="dim" style="margin-top:8px; font-weight:500;">Тренировка сохранена</p>
     </div>
-    
     <div class="card" style="background:var(--surface); padding:20px; border-radius:var(--radius-md); border:var(--border); margin-bottom:24px;">
       ${summary || '<div class="dim">Нет данных</div>'}
     </div>
-    
     ${nid ? `<button class="btn btn-primary" data-action="nextDay" data-id="${e(nid)}">Следующий день ${ICON.arrowRight}</button>` : ''}
     <button class="btn btn-secondary mt-10" data-action="goMenu">В меню</button>
   `;
@@ -388,7 +436,7 @@ function renderDayEdit() {
   const id = state.editingDayId;
   const d = id ? state.plans[id] : null;
   if (!d) return `<div class="top-bar"><h1>День</h1><button class="close-btn" data-action="closeDayEdit">${ICON.x}</button></div><div class="empty">День не найден.</div>`;
-  const isCustom = id.startsWith('custom_');
+  const isCustom = id.startsWith('custom_') || id.startsWith('gen_');
   let rows = '';
   d.exercises.forEach((exId, i) => {
     const ex = EXERCISES[exId]; if (!ex) return;
@@ -429,6 +477,56 @@ function renderNewDayDialog() {
   return `<div class="modal-backdrop" id="newDayDialogBackdrop"><div class="modal"><h3>Новый день</h3><input type="text" class="modal-input" id="newDayNameInput" maxlength="50" placeholder="Название дня..." value="${e(state.newDayName || '')}"><button class="btn btn-primary" data-action="createNewDay">Создать</button><button class="btn btn-secondary btn-small mt-10" data-action="closeNewDay">Отмена</button></div></div>`;
 }
 
+function renderGeneratorDialog() {
+  return `<div class="modal-backdrop" id="generatorDialogBackdrop">
+    <div class="modal">
+      <h3>Умный генератор</h3>
+      
+      <div style="margin-bottom:16px;">
+        <div class="progress-label" style="color:var(--text-muted); margin-bottom:8px;">Цель</div>
+        <div class="chips">
+          <button class="chip ${generatorOptions.goal === 'hypertrophy' ? 'active' : ''}" data-action="genSetGoal" data-val="hypertrophy">Масса</button>
+          <button class="chip ${generatorOptions.goal === 'strength' ? 'active' : ''}" data-action="genSetGoal" data-val="strength">Сила</button>
+          <button class="chip ${generatorOptions.goal === 'endurance' ? 'active' : ''}" data-action="genSetGoal" data-val="endurance">Выносливость</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div class="progress-label" style="color:var(--text-muted); margin-bottom:8px;">Опыт</div>
+        <div class="chips">
+          <button class="chip ${generatorOptions.exp === 'beginner' ? 'active' : ''}" data-action="genSetExp" data-val="beginner">Новичок</button>
+          <button class="chip ${generatorOptions.exp === 'intermediate' ? 'active' : ''}" data-action="genSetExp" data-val="intermediate">Средний</button>
+          <button class="chip ${generatorOptions.exp === 'advanced' ? 'active' : ''}" data-action="genSetExp" data-val="advanced">Профи</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div class="progress-label" style="color:var(--text-muted); margin-bottom:8px;">Дней в неделю</div>
+        <div class="chips">
+          <button class="chip ${generatorOptions.days === 2 ? 'active' : ''}" data-action="genSetDays" data-val="2">2</button>
+          <button class="chip ${generatorOptions.days === 3 ? 'active' : ''}" data-action="genSetDays" data-val="3">3</button>
+          <button class="chip ${generatorOptions.days === 4 ? 'active' : ''}" data-action="genSetDays" data-val="4">4</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="progress-label" style="color:var(--text-muted); margin-bottom:8px;">Оборудование</div>
+        <div class="chips" style="flex-wrap:wrap;">
+          <button class="chip ${generatorOptions.equipment.includes('all') ? 'active' : ''}" data-action="genToggleEq" data-val="all">Всё</button>
+          <button class="chip ${generatorOptions.equipment.includes('barbell') ? 'active' : ''}" data-action="genToggleEq" data-val="barbell">Штанга</button>
+          <button class="chip ${generatorOptions.equipment.includes('dumbbell') ? 'active' : ''}" data-action="genToggleEq" data-val="dumbbell">Гантели</button>
+          <button class="chip ${generatorOptions.equipment.includes('machine') ? 'active' : ''}" data-action="genToggleEq" data-val="machine">Тренажеры</button>
+          <button class="chip ${generatorOptions.equipment.includes('cable') ? 'active' : ''}" data-action="genToggleEq" data-val="cable">Блоки</button>
+          <button class="chip ${generatorOptions.equipment.includes('bodyweight') ? 'active' : ''}" data-action="genToggleEq" data-val="bodyweight">Свой вес</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" data-action="generatePlanAction">Создать программу</button>
+      <button class="btn btn-secondary btn-small mt-10" data-action="closeGenerator">Отмена</button>
+    </div>
+  </div>`;
+}
+
 let csvModalData = null;
 function showCsvModal(csv) {
   closeCsvModal();
@@ -451,7 +549,7 @@ function closeCsvModal() {
   const el = document.getElementById('csvModalBackdrop');
   if (el) el.remove();
   csvModalData = null;
-  if (!state.pendingAdd && !state.newDayOpen) document.body.classList.remove('modal-open');
+  if (!state.pendingAdd && !state.newDayOpen && !state.generatorOpen) document.body.classList.remove('modal-open');
 }
 
 function startRestTicker() { if (restTicker) return; restTicker = setInterval(updateRestUI, LIMITS.restTickMs); }
@@ -599,7 +697,7 @@ async function cancelWorkout() {
 
 export function goMenu() {
   state.screen = 'menu';
-  state.pendingAdd = null; state.newDayOpen = false; state.rest = null;
+  state.pendingAdd = null; state.newDayOpen = false; state.generatorOpen = false; state.rest = null;
   state.editingDayId = null; state.pickForDayId = null;
   disableCloseConfirm();
   lastSyncKey = ''; prevRenderKey = '';
@@ -614,6 +712,52 @@ function openNewDay() {
 }
 function closeNewDay() {
   state.newDayOpen = false; state.newDayName = ''; render();
+}
+
+function openGenerator() {
+  state.generatorOpen = true;
+  saveState(); render();
+}
+
+function closeGenerator() {
+  state.generatorOpen = false;
+  saveState(); render();
+}
+
+function toggleEq(val) {
+  if (val === 'all') {
+    generatorOptions.equipment = ['all'];
+  } else {
+    generatorOptions.equipment = generatorOptions.equipment.filter(e => e !== 'all');
+    if (generatorOptions.equipment.includes(val)) {
+      generatorOptions.equipment = generatorOptions.equipment.filter(e => e !== val);
+    } else {
+      generatorOptions.equipment.push(val);
+    }
+    if (generatorOptions.equipment.length === 0) generatorOptions.equipment = ['all'];
+  }
+  render();
+}
+
+function applyGeneratedPlan() {
+  const newPlans = generatePlan({
+    goal: generatorOptions.goal,
+    exp: generatorOptions.exp,
+    daysPerWeek: generatorOptions.days,
+    equipment: generatorOptions.equipment
+  });
+
+  if (!newPlans) {
+    uiAlert('Недостаточно оборудования для генерации. Выберите больше вариантов.');
+    return;
+  }
+
+  Object.assign(state.plans, newPlans);
+  state.generatorOpen = false;
+  invalidatePlanCaches();
+  saveState(); render();
+  hapticNotify('success');
+  uiAlert('Ваш план готов! Приятных тренировок.');
 }
 
 function exitLibrary() {
@@ -764,6 +908,12 @@ export const ACTIONS = {
   cancelWorkout: () => cancelWorkout(), goMenu: () => goMenu(),
   openLibrary: () => openLibrary(), exitLibrary: () => exitLibrary(), openHistory: () => openHistory(),
   openNewDay: () => openNewDay(), closeNewDay: () => closeNewDay(), createNewDay: () => createNewDay(),
+  openGenerator: () => openGenerator(), closeGenerator: () => closeGenerator(),
+  generatePlanAction: () => applyGeneratedPlan(),
+  genSetGoal: el => { generatorOptions.goal = el.dataset.val; render(); },
+  genSetExp: el => { generatorOptions.exp = el.dataset.val; render(); },
+  genSetDays: el => { generatorOptions.days = Number(el.dataset.val); render(); },
+  genToggleEq: el => toggleEq(el.dataset.val),
   exportCsv: () => exportCsv(),
   copyCsv: async () => {
     if (!csvModalData) return;
