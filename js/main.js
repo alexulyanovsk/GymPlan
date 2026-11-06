@@ -1,13 +1,15 @@
 /**
  * Файл: js/main.js
- * Версия: 2.0.0
- * Описание: Корректный fatal-error, безопасная загрузка, защита от double-back.
+ * Версия: 2.1.0
+ * Описание: initDone-флаг, race-fix loadState, emergencySave с rest, controllerchange не релоадит при активном input.
  */
 
 import { loadState, saveState, flushNow, importData, state } from './state.js';
 import { render, ACTIONS, renderLibraryList, initBridgeEvents, handleBack } from './ui.js';
 import { uiConfirm, uiAlert, closeApp } from './bridge.js';
 import { LIMITS } from './data.js';
+
+let initDone = false;
 
 function showFatalError(err) {
   console.error('[GymPlan Fatal]', err);
@@ -16,13 +18,38 @@ function showFatalError(err) {
   app.className = '';
   app.innerHTML = '';
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'padding:20px;color:#FF6B6B;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;';
-  wrap.textContent = 'Ошибка запуска:\n' + (err?.message || String(err)) + '\n\n' + (err?.stack || '');
+  wrap.style.cssText = 'padding:20px;color:#FF6B6B;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-word;';
+  const msg = document.createElement('div');
+  msg.textContent = 'Ошибка запуска: ' + (err?.message || String(err));
+  msg.style.cssText = 'margin-bottom:12px;font-weight:bold;';
+  const details = document.createElement('details');
+  const sum = document.createElement('summary');
+  sum.textContent = 'Технические детали';
+  sum.style.cssText = 'cursor:pointer;color:#8E8E93;margin-bottom:8px;';
+  const pre = document.createElement('pre');
+  pre.textContent = err?.stack || '(no stack)';
+  pre.style.cssText = 'font-size:11px;color:#8E8E93;margin:0;white-space:pre-wrap;';
+  details.appendChild(sum);
+  details.appendChild(pre);
+  const reload = document.createElement('button');
+  reload.textContent = 'Перезапустить';
+  reload.style.cssText = 'margin-top:16px;padding:12px 20px;background:#CCFF00;color:#000;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:inherit;';
+  reload.onclick = () => location.reload();
+  wrap.appendChild(msg);
+  wrap.appendChild(details);
+  wrap.appendChild(reload);
   app.appendChild(wrap);
 }
 
-window.addEventListener('error', e => showFatalError(e.error || new Error(String(e.message))));
-window.addEventListener('unhandledrejection', e => showFatalError(e.reason));
+window.addEventListener('error', e => {
+  if (!initDone) showFatalError(e.error || new Error(String(e.message)));
+  else console.error('[GymPlan] Runtime error:', e.error);
+});
+
+window.addEventListener('unhandledrejection', e => {
+  if (!initDone) showFatalError(e.reason);
+  else console.error('[GymPlan] Unhandled rejection:', e.reason);
+});
 
 document.body.addEventListener('click', ev => {
   if (ev.target.id === 'addDialogBackdrop') { ACTIONS.closeAddDialog(); return; }
@@ -65,7 +92,7 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
     await importData(file);
     render();
   } catch (err) {
-    alert('Ошибка импорта: ' + (err?.message || 'неверный формат файла'));
+    uiAlert('Ошибка импорта: ' + (err?.message || 'неверный формат файла'));
   }
   e.target.value = '';
 });
@@ -75,9 +102,15 @@ function emergencySave() {
     const ts = Date.now();
     state._lastSavedTs = ts;
     localStorage.setItem('gymplan_emergency', JSON.stringify({
-      plans: state.plans, screen: state.screen, currentDayId: state.currentDayId,
-      workout: state.workout, history: state.history, weights: state.weights,
-      lastCompletedTs: state.lastCompletedTs, _lastSavedTs: ts
+      plans: state.plans,
+      screen: state.screen,
+      currentDayId: state.currentDayId,
+      workout: state.workout,
+      history: state.history,
+      weights: state.weights,
+      lastCompletedTs: state.lastCompletedTs,
+      rest: state.rest,          // ← добавлено: сохраняем таймер отдыха
+      _lastSavedTs: ts
     }));
   } catch(_) {}
 }
@@ -99,14 +132,11 @@ function setupBackHandler() {
   } catch(e) { console.warn('[GymPlan] History API недоступен:', e); }
 
   window.addEventListener('popstate', async () => {
-    // Не обрабатываем повторный popstate, пока открыт confirm или идёт обработка
     if (backHandling) return;
-
     if (handleBack()) {
       try { history.pushState({ gymplan: true }, ''); } catch(_) {}
       return;
     }
-
     try { history.pushState({ gymplan: true }, ''); } catch(_) {}
 
     const now = Date.now();
@@ -137,9 +167,7 @@ function setupServiceWorkerUpdates() {
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
     .then(reg => {
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          reg.update().catch(() => {});
-        }
+        if (document.visibilityState === 'visible') reg.update().catch(() => {});
       });
       setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000);
     })
@@ -147,11 +175,16 @@ function setupServiceWorkerUpdates() {
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (swReloading) return;
-    // Не перезагружаем на первом контроллере (первая установка SW)
     const firstInstall = !navigator.serviceWorker.controller;
     if (firstInstall) return;
     if (state.screen === 'workout' || state.rest) {
       console.log('[GymPlan] Обновление готово. Применится после завершения тренировки.');
+      return;
+    }
+    // Не релоадить, если пользователь сейчас печатает
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+      console.log('[GymPlan] Обновление отложено: пользователь вводит текст');
       return;
     }
     swReloading = true;
@@ -164,24 +197,35 @@ function setupServiceWorkerUpdates() {
     initBridgeEvents();
     setupBackHandler();
 
+    // Ждём loadState с внутренним таймаутом. Если он завершится позже —
+    // делаем re-render.
     let loadErr = null;
+    const loadPromise = loadState();
     try {
       await Promise.race([
-        loadState(),
+        loadPromise,
         new Promise((_, rej) => setTimeout(() => rej(new Error('loadState timeout')), 5000))
       ]);
     } catch(e) {
       loadErr = e;
-      console.warn('[GymPlan] loadState failed:', e);
+      console.warn('[GymPlan] loadState timeout:', e);
     }
 
     render();
 
-    if (!loadErr) {
-      setupServiceWorkerUpdates();
+    // loadState завершился позже — данные уже пришли, перерисуем
+    if (loadErr) {
+      loadPromise
+        .then(() => {
+          console.warn('[GymPlan] loadState resolved late, re-rendering');
+          render();
+        })
+        .catch(() => {});
     }
 
+    setupServiceWorkerUpdates();
     window.__GYMPLAN_LOADED = true;
+    initDone = true;
   } catch (err) {
     showFatalError(err);
   }
