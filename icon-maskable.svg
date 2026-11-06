@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Фон должен быть НЕПРОЗРАЧНЫМ и покрывать весь холст, иначе Android нарисует свои полосы -->
+  <rect width="512" height="512" fill="#09090B"/>
+
+  <!-- Safe zone: 60% от полотна (307.2px). Отступ 20% (102.4px) с каждой стороны -->
+  <g transform="translate(256 256) scale(0.6) translate(-256 -256)">
+    <defs>
+      <mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+        <rect x="0" y="0" width="512" height="512" fill="white"/>
+        <circle cx="150" cy="256" r="25" fill="black"/>
+        <circle cx="362" cy="256" r="25" fill="black"/>
+      </mask>
+    </defs>
+    <g mask="url(#holeMask)">
+      <path d="M150 200v112m212-112v112M100 250h312" stroke="#CCFF00" stroke-width="40" stroke-linecap="round"/>
+      <circle cx="150" cy="256" r="30" fill="none" stroke="#CCFF00" stroke-width="20"/>
+      <circle cx="362" cy="256" r="30" fill="none" stroke="#CCFF00" stroke-width="20"/>
+    </g>
+  </g>
+</svg>
