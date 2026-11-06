@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 6.3.0
- * Описание: Финальная гантель (точные пропорции из icon.svg).
+ * Версия: 8.0.0
+ * Описание: Идеальная SVG-гантель от пользователя. Цвета привязаны к теме.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -33,17 +33,12 @@ const ICON = {
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
   
-  // ИДЕАЛЬНАЯ ГАНТЕЛЬ (Толщина 16, Высота блинов 60, Расстояние между центрами 40)
-  dumbbell: `<svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Горизонтальный гриф (длина 80, толщина 16) -->
-    <rect x="10" y="42" width="80" height="16" rx="8" fill="var(--accent)"/>
-    <!-- Левый блин (ширина 16, высота 60) -->
-    <rect x="22" y="20" width="16" height="60" rx="8" fill="var(--accent)"/>
-    <!-- Правый блин (ширина 16, высота 60) -->
-    <rect x="62" y="20" width="16" height="60" rx="8" fill="var(--accent)"/>
-    <!-- Отверстия на пересечении (радиус 5) -->
-    <circle cx="30" cy="50" r="5" fill="var(--bg)"/>
-    <circle cx="70" cy="50" r="5" fill="var(--bg)"/>
+  // ТВОЙ ИДЕАЛЬНЫЙ КОД
+  dumbbell: `<svg width="120" height="120" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="100" fill="var(--bg)"/>
+    <path d="M150 200v112m212-112v112M100 250h312" stroke="var(--accent)" stroke-width="40" stroke-linecap="round"/>
+    <circle cx="150" cy="256" r="30" fill="var(--bg)" stroke="var(--accent)" stroke-width="20"/>
+    <circle cx="362" cy="256" r="30" fill="var(--bg)" stroke="var(--accent)" stroke-width="20"/>
   </svg>`
 };
 
