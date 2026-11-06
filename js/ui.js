@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 6.2.0
- * Описание: ИСПРАВЛЕНА гантель (блины и гриф одинаковой толщины).
+ * Версия: 6.3.0
+ * Описание: Финальная гантель (точные пропорции из icon.svg).
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -33,17 +33,17 @@ const ICON = {
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
   
-  // ИДЕАЛЬНАЯ ГАНТЕЛЬ: блины и гриф ровно 16px толщиной
+  // ИДЕАЛЬНАЯ ГАНТЕЛЬ (Толщина 16, Высота блинов 60, Расстояние между центрами 40)
   dumbbell: `<svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Левый блин (ширина 16, высота 60) -->
-    <rect x="25" y="20" width="16" height="60" rx="8" fill="var(--accent)"/>
-    <!-- Правый блин (ширина 16, высота 60) -->
-    <rect x="59" y="20" width="16" height="60" rx="8" fill="var(--accent)"/>
-    <!-- Горизонтальный гриф (высота 16, проходит сквозь) -->
+    <!-- Горизонтальный гриф (длина 80, толщина 16) -->
     <rect x="10" y="42" width="80" height="16" rx="8" fill="var(--accent)"/>
-    <!-- Отверстия на пересечении -->
-    <circle cx="33" cy="50" r="7" fill="var(--bg)"/>
-    <circle cx="67" cy="50" r="7" fill="var(--bg)"/>
+    <!-- Левый блин (ширина 16, высота 60) -->
+    <rect x="22" y="20" width="16" height="60" rx="8" fill="var(--accent)"/>
+    <!-- Правый блин (ширина 16, высота 60) -->
+    <rect x="62" y="20" width="16" height="60" rx="8" fill="var(--accent)"/>
+    <!-- Отверстия на пересечении (радиус 5) -->
+    <circle cx="30" cy="50" r="5" fill="var(--bg)"/>
+    <circle cx="70" cy="50" r="5" fill="var(--bg)"/>
   </svg>`
 };
 
