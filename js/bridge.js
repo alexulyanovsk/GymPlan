@@ -1,7 +1,7 @@
 /**
  * Файл: js/bridge.js
- * Версия: 1.3.0
- * Описание: Обновлена палитра под новый дизайн 2027.
+ * Версия: 1.4.0
+ * Описание: Кастомные модальные окна вместо стандартных alert/confirm.
  */
 
 export const tg = window.WebApp || window.Telegram?.WebApp;
@@ -25,13 +25,51 @@ export function uiConfirm(msg) {
     if (IS_MAX && tg?.showConfirm) {
       try { tg.showConfirm(msg, done); return; } catch(_) {}
     }
-    try { done(window.confirm(msg)); } catch(_) { done(false); }
+    
+    // Кастомный UI
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-backdrop';
+    overlay.style.zIndex = '9999';
+    overlay.style.alignItems = 'center';
+    overlay.style.padding = '20px';
+    
+    overlay.innerHTML = `
+      <div class="modal" style="border-radius: 24px; border: 1px solid rgba(255,255,255,0.08); width: 100%; max-width: 320px; padding: 24px; text-align: center; background: var(--surface); animation: scaleUp 0.2s var(--spring);">
+        <p style="margin-bottom: 20px; font-size: 16px; line-height: 1.4; font-weight: 500;">${msg}</p>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" style="padding: 12px; flex: 1; font-size: 15px;" id="uiConfirmCancel">Отмена</button>
+          <button class="btn btn-primary" style="padding: 12px; flex: 1; font-size: 15px;" id="uiConfirmOk">ОК</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    const close = (val) => { overlay.remove(); done(val); };
+    overlay.querySelector('#uiConfirmCancel').onclick = () => close(false);
+    overlay.querySelector('#uiConfirmOk').onclick = () => close(true);
   });
 }
 
 export function uiAlert(msg) {
   if (IS_MAX && tg?.showAlert) { try { tg.showAlert(msg); return; } catch(_) {} }
-  try { alert(msg); } catch(_) {}
+  
+  // Кастомный UI
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-backdrop';
+  overlay.style.zIndex = '9999';
+  overlay.style.alignItems = 'center';
+  overlay.style.padding = '20px';
+  
+  overlay.innerHTML = `
+    <div class="modal" style="border-radius: 24px; border: 1px solid rgba(255,255,255,0.08); width: 100%; max-width: 320px; padding: 24px; text-align: center; background: var(--surface); animation: scaleUp 0.2s var(--spring);">
+      <p style="margin-bottom: 20px; font-size: 16px; line-height: 1.4; font-weight: 500;">${msg}</p>
+      <button class="btn btn-primary" style="padding: 12px; font-size: 15px;" id="uiAlertOk">ОК</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  
+  overlay.querySelector('#uiAlertOk').onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 }
 
 export function enableCloseConfirm() {
