@@ -1,9 +1,9 @@
 /**
  * Файл: sw.js
- * Версия: 7.0.0 (Добавлен generator.js, обновлен кэш)
+ * Версия: 8.0.0 (Обновление кэша из-за правок в ui.js)
  */
 
-const CACHE_NAME = 'gymplan-v7';
+const CACHE_NAME = 'gymplan-v8';
 const APP_SHELL = [
   '/GymPlan/',
   '/GymPlan/index.html',
@@ -18,7 +18,7 @@ const APP_SHELL = [
   '/GymPlan/js/db.js',
   '/GymPlan/js/bridge.js',
   '/GymPlan/js/utils.js',
-  '/GymPlan/js/generator.js' // <--- ДОБАВЛЕН НОВЫЙ ФАЙЛ
+  '/GymPlan/js/generator.js'
 ];
 
 self.addEventListener('install', (e) => {
