@@ -1,6 +1,7 @@
 /**
  * Файл: js/generator.js
- * Описание: Умный генератор с исключением групп и добавлением Кора.
+ * Версия: 2.1.0
+ * Описание: Схемы подходов сохраняются в самом дне, а не мутируют EXERCISES.
  */
 
 import { EXERCISES, EX_ENTRIES } from './data.js';
@@ -27,7 +28,6 @@ const COMPOUNDS = {
   'Кор': ['core_plank', 'core_crunches', 'core_leg_raise', 'core_cable_crunch', 'core_russian_twist', 'core_ab_rollout']
 };
 
-// Маппинг для 5 основных групп исключения
 const GROUP_MAPPING = {
   'Грудь': ['Грудь'],
   'Спина': ['Спина'],
@@ -38,8 +38,7 @@ const GROUP_MAPPING = {
 
 export function generatePlan(options) {
   const { goal, exp, daysPerWeek, equipment, excludedGroups = [] } = options;
-  
-  // 1. Фильтруем доступные упражнения
+
   let availableEx = EX_ENTRIES.filter(([id, ex]) => {
     if (equipment.includes('all')) return true;
     for (const eq of equipment) {
@@ -49,17 +48,14 @@ export function generatePlan(options) {
     return false;
   }).map(([id]) => id);
 
-  // 2. Проверяем, что осталось хотя бы 2 группы
   const includedGroups = Object.keys(GROUP_MAPPING).filter(g => !excludedGroups.includes(g));
   if (includedGroups.length < 2) return null;
 
-  // 3. Убираем упражнения из исключенных групп
   const excludedRawMuscles = excludedGroups.flatMap(g => GROUP_MAPPING[g] || []);
   availableEx = availableEx.filter(id => !excludedRawMuscles.includes(EXERCISES[id].muscle));
 
   if (availableEx.length < 10) return null;
 
-  // 4. Параметры
   let sets = 3, repMin = 8, repMax = 12;
   if (goal === 'strength') { sets = 4; repMin = 4; repMax = 6; }
   if (goal === 'endurance') { sets = 3; repMin = 15; repMax = 20; }
@@ -69,11 +65,8 @@ export function generatePlan(options) {
   const hasLegs = !excludedGroups.includes('Ноги');
   const plans = {};
 
-  // 5. Создание дня
   const createDay = (title, targetRawMuscles) => {
     const exercises = [];
-    
-    // Перемешиваем мышцы, чтобы упражнения не шли подряд на одну группу
     const shuffledMuscles = [...targetRawMuscles].sort(() => Math.random() - 0.5);
 
     shuffledMuscles.forEach(mg => {
@@ -86,7 +79,6 @@ export function generatePlan(options) {
       if (exp === 'advanced' && isolations.length > 1) exercises.push(isolations[1]);
     });
 
-    // Всегда добавляем 1 упражнение на Кор в конец
     if (!excludedGroups.includes('Кор')) {
       const coreCompounds = COMPOUNDS['Кор'] || [];
       const availableCore = coreCompounds.filter(id => availableEx.includes(id));
@@ -95,18 +87,13 @@ export function generatePlan(options) {
       }
     }
 
-    exercises.forEach(id => {
-      EXERCISES[id].sets = sets;
-      EXERCISES[id].repMin = repMin;
-      EXERCISES[id].repMax = repMax;
-    });
-
-    return { title, exercises: exercises.slice(0, 7) };
+    const trimmed = exercises.slice(0, 7);
+    const schemes = {};
+    trimmed.forEach(id => { schemes[id] = { sets, repMin, repMax }; });
+    return { title, exercises: trimmed, schemes };
   };
 
-  // 6. Формирование сплита
   if (hasLegs) {
-    // Стандартные сплиты
     if (daysPerWeek === 2) {
       plans['gen_full_1'] = createDay('День 1 · Full Body A', ['Грудь', 'Спина', 'Квадрицепс', 'Бицепс бедра']);
       plans['gen_full_2'] = createDay('День 2 · Full Body B', ['Плечи (Перед/Сред)', 'Ягодицы', 'Бицепс', 'Трицепс']);
@@ -121,7 +108,6 @@ export function generatePlan(options) {
       plans['gen_lower_2'] = createDay('День 4 · Lower B', ['Квадрицепс', 'Бицепс бедра', 'Ягодицы']);
     }
   } else {
-    // Сплиты без ног (Push/Pull)
     if (daysPerWeek === 2) {
       plans['gen_upper_1'] = createDay('День 1 · Верх A', ['Грудь', 'Спина', 'Плечи (Перед/Сред)', 'Трицепс']);
       plans['gen_upper_2'] = createDay('День 2 · Верх B', ['Плечи (Зад)', 'Бицепс', 'Трицепс']);
