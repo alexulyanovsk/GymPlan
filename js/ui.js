@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 4.0.0
- * Описание: Улучшенная SVG-гантель. Увеличен GIF на экране тренировки.
+ * Версия: 5.1.0
+ * Описание: Точная гантель. Растягивающийся GIF.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -33,17 +33,17 @@ const ICON = {
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
   
-  // ИСПРАВЛЕНО: Гантель растянута, блины тоньше перекладины
-  dumbbell: `<svg width="100" height="80" viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Горизонтальная перекладина (толстая и длинная) -->
-    <rect x="5" y="42" width="110" height="16" rx="8" fill="var(--accent)"/>
-    <!-- Левый блин (тоньше перекладины) -->
-    <rect x="25" y="20" width="14" height="60" rx="7" fill="var(--accent)"/>
+  // ТОЧНАЯ КОПИЯ ФАЙЛА ICON.SVG
+  dumbbell: `<svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Горизонтальная перекладина (торчит по краям) -->
+    <rect x="5" y="35" width="110" height="10" rx="5" fill="var(--accent)"/>
+    <!-- Левый блин -->
+    <rect x="22" y="15" width="20" height="50" rx="10" fill="var(--accent)"/>
     <!-- Правый блин -->
-    <rect x="81" y="20" width="14" height="60" rx="7" fill="var(--accent)"/>
+    <rect x="78" y="15" width="20" height="50" rx="10" fill="var(--accent)"/>
     <!-- Отверстия на пересечении -->
-    <circle cx="32" cy="50" r="4.5" fill="var(--bg)"/>
-    <circle cx="88" cy="50" r="4.5" fill="var(--bg)"/>
+    <circle cx="32" cy="40" r="5" fill="var(--bg)"/>
+    <circle cx="88" cy="40" r="5" fill="var(--bg)"/>
   </svg>`
 };
 
