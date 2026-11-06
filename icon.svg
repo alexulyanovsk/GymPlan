@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="100" fill="#0f0f11"/>
-  <path d="M150 200v112m212-112v112M100 250h312" stroke="#3DDC84" stroke-width="40" stroke-linecap="round"/>
-  <circle cx="150" cy="256" r="30" fill="#0f0f11" stroke="#3DDC84" stroke-width="20"/>
-  <circle cx="362" cy="256" r="30" fill="#0f0f11" stroke="#3DDC84" stroke-width="20"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Темный фон приложения со скругленными углами -->
+  <rect width="100" height="100" rx="20" fill="#09090B"/>
+  
+  <!-- Гантель (толщина всех элементов 14, высота блинов 42, длина грифа 80) -->
+  <path fill-rule="evenodd" clip-rule="evenodd" d="
+    M 22 29 L 36 29 L 36 43 L 64 43 L 64 29 L 78 29 L 78 43 L 90 43 L 90 57 L 78 57 L 78 71 L 64 71 L 64 57 L 36 57 L 36 71 L 22 71 L 22 57 L 10 57 L 10 43 L 22 43 Z 
+    M 29 45 A 5 5 0 1 0 29 55 A 5 5 0 1 0 29 45 Z 
+    M 71 45 A 5 5 0 1 0 71 55 A 5 5 0 1 0 71 45 Z
+  " fill="#CCFF00"/>
 </svg>
