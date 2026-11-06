@@ -1,24 +1,27 @@
 /**
  * Файл: js/main.js
- * Версия: 1.4.0
- * Описание: Добавлено аварийное сохранение при закрытии и защита от потери данных.
+ * Версия: 2.0.0
+ * Описание: Корректный fatal-error, безопасная загрузка, защита от double-back.
  */
 
 import { loadState, saveState, flushNow, importData, state } from './state.js';
 import { render, ACTIONS, renderLibraryList, initBridgeEvents, handleBack } from './ui.js';
 import { uiConfirm, uiAlert, closeApp } from './bridge.js';
-
-window.__GYMPLAN_LOADED = true;
+import { LIMITS } from './data.js';
 
 function showFatalError(err) {
   console.error('[GymPlan Fatal]', err);
   const app = document.getElementById('app');
-  if (app && app.innerHTML.includes('Загрузка')) {
-    app.innerHTML = `<div style="padding:20px;color:#FF6B6B;font-family:monospace;font-size:12px;white-space:pre-wrap;">Ошибка запуска:\n${err?.message || err}\n\n${err?.stack || ''}</div>`;
-  }
+  if (!app) return;
+  app.className = '';
+  app.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'padding:20px;color:#FF6B6B;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;';
+  wrap.textContent = 'Ошибка запуска:\n' + (err?.message || String(err)) + '\n\n' + (err?.stack || '');
+  app.appendChild(wrap);
 }
 
-window.addEventListener('error', e => showFatalError(e.error));
+window.addEventListener('error', e => showFatalError(e.error || new Error(String(e.message))));
 window.addEventListener('unhandledrejection', e => showFatalError(e.reason));
 
 document.body.addEventListener('click', ev => {
@@ -47,7 +50,7 @@ document.body.addEventListener('input', ev => {
       const list = document.getElementById('libList');
       if (list) list.innerHTML = renderLibraryList();
       saveState();
-    }, 150);
+    }, LIMITS.searchDebounceMs);
   }
 });
 
@@ -62,12 +65,11 @@ document.getElementById('importFile').addEventListener('change', async (e) => {
     await importData(file);
     render();
   } catch (err) {
-    alert('Ошибка импорта: неверный формат файла');
+    alert('Ошибка импорта: ' + (err?.message || 'неверный формат файла'));
   }
   e.target.value = '';
 });
 
-// Аварийное сохранение
 function emergencySave() {
   try {
     const ts = Date.now();
@@ -87,15 +89,19 @@ document.addEventListener('visibilitychange', () => {
 });
 
 let lastBackPress = 0;
+let backHandling = false;
 const DOUBLE_BACK_MS = 2000;
 
 function setupBackHandler() {
   try {
     history.replaceState({ gymplan: true }, '');
     history.pushState({ gymplan: true }, '');
-  } catch(e) { console.warn('History API недоступен:', e); }
+  } catch(e) { console.warn('[GymPlan] History API недоступен:', e); }
 
   window.addEventListener('popstate', async () => {
+    // Не обрабатываем повторный popstate, пока открыт confirm или идёт обработка
+    if (backHandling) return;
+
     if (handleBack()) {
       try { history.pushState({ gymplan: true }, ''); } catch(_) {}
       return;
@@ -105,13 +111,18 @@ function setupBackHandler() {
 
     const now = Date.now();
     if (now - lastBackPress < DOUBLE_BACK_MS) {
+      lastBackPress = 0;
       const closed = closeApp();
       if (!closed) uiAlert('Закройте приложение через меню устройства');
       return;
     }
-    lastBackPress = now;
 
+    backHandling = true;
+    lastBackPress = now;
     const ok = await uiConfirm('Выйти из GymPlan?');
+    backHandling = false;
+    lastBackPress = 0;
+
     if (ok) {
       const closed = closeApp();
       if (!closed) uiAlert('Закройте приложение через меню устройства');
@@ -136,20 +147,15 @@ function setupServiceWorkerUpdates() {
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (swReloading) return;
-    swReloading = true;
+    // Не перезагружаем на первом контроллере (первая установка SW)
+    const firstInstall = !navigator.serviceWorker.controller;
+    if (firstInstall) return;
     if (state.screen === 'workout' || state.rest) {
-      console.log('[SW] Обновление готово. Применится после завершения тренировки.');
+      console.log('[GymPlan] Обновление готово. Применится после завершения тренировки.');
       return;
     }
+    swReloading = true;
     window.location.reload();
-  });
-
-  navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.type === 'SW_UPDATED' && state.screen !== 'workout' && !state.rest) {
-      if (swReloading) return;
-      swReloading = true;
-      window.location.reload();
-    }
   });
 }
 
@@ -157,15 +163,25 @@ function setupServiceWorkerUpdates() {
   try {
     initBridgeEvents();
     setupBackHandler();
+
+    let loadErr = null;
+    try {
+      await Promise.race([
+        loadState(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('loadState timeout')), 5000))
+      ]);
+    } catch(e) {
+      loadErr = e;
+      console.warn('[GymPlan] loadState failed:', e);
+    }
+
     render();
 
-    await Promise.race([
-      loadState(),
-      new Promise(resolve => setTimeout(resolve, 2500))
-    ]);
+    if (!loadErr) {
+      setupServiceWorkerUpdates();
+    }
 
-    render();
-    setupServiceWorkerUpdates();
+    window.__GYMPLAN_LOADED = true;
   } catch (err) {
     showFatalError(err);
   }
