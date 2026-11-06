@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 3.0.0
- * Описание: Value First Onboarding. Empty State с генератором.
+ * Версия: 3.2.0
+ * Описание: Интегрирован умный генератор с исключением групп.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -16,7 +16,7 @@ let lastSyncKey = '';
 let prevRenderKey = '';
 let doneSetRunning = false;
 let csvExportRunning = false;
-let generatorOptions = { goal: 'hypertrophy', exp: 'intermediate', days: 4, equipment: ['barbell', 'dumbbell', 'machine'] };
+let generatorOptions = { goal: 'hypertrophy', exp: 'intermediate', days: 4, equipment: ['barbell', 'dumbbell', 'machine'], excludedGroups: [] };
 
 const ICON = {
   play: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
@@ -31,7 +31,8 @@ const ICON = {
   arrowDown: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>`,
   trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
-  sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`
+  sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
+  dumbbell: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8"/><path d="M7 7v10"/><path d="M17 7v10"/><circle cx="7" cy="12" r="2.5" fill="var(--bg)"/><circle cx="17" cy="12" r="2.5" fill="var(--bg)"/></svg>`
 };
 
 export function handleBack() {
@@ -176,19 +177,20 @@ function renderMenu() {
 
   if (!hasPlans) {
     return `
-      <div class="menu-header">
-        <h1>GymPlan</h1>
+      <div class="menu-header" style="text-align: center;">
+        <h1 style="margin-bottom: 4px;">GymPlan</h1>
         <p class="dim small" style="font-weight:500; margin:0;">Умный трекер тренировок</p>
       </div>
       
       <div class="menu-scroll-area" style="justify-content:center; align-items:center; text-align:center;">
-        <div style="width:80px; height:80px; background:rgba(204,255,0,0.1); border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--accent); margin-bottom:24px;">
-          ${ICON.sparkles}
+        <div style="margin-bottom:24px; opacity: 0.9;">
+          ${ICON.dumbbell}
         </div>
-        <h1 style="margin-bottom:12px;">Добро пожаловать!</h1>
-        <p class="dim" style="margin-bottom:32px; max-width:280px; font-weight:500;">
+        <h2 style="font-size: 26px; font-weight: 800; margin-bottom:12px; letter-spacing: -0.5px;">Добро пожаловать!</h2>
+        <p class="dim" style="margin-bottom:32px; max-width:280px; font-weight:500; font-size: 15px;">
           У вас пока нет плана. Позвольте нашему алгоритму создать идеальную программу под ваши цели и оборудование.
         </p>
+        
         <button class="btn btn-primary" data-action="openGenerator" style="width:100%; max-width:300px;">
           ${ICON.sparkles} Сгенерировать план
         </button>
@@ -478,6 +480,12 @@ function renderNewDayDialog() {
 }
 
 function renderGeneratorDialog() {
+  const groups = ['Грудь', 'Спина', 'Плечи', 'Руки', 'Ноги'];
+  const groupChips = groups.map(g => {
+    const isExcluded = generatorOptions.excludedGroups.includes(g);
+    return `<button class="chip ${isExcluded ? 'excluded' : ''}" data-action="genToggleExclude" data-val="${g}">${g} ${isExcluded ? '✕' : ''}</button>`;
+  }).join('');
+
   return `<div class="modal-backdrop" id="generatorDialogBackdrop">
     <div class="modal">
       <h3>Умный генератор</h3>
@@ -509,7 +517,7 @@ function renderGeneratorDialog() {
         </div>
       </div>
 
-      <div style="margin-bottom:24px;">
+      <div style="margin-bottom:16px;">
         <div class="progress-label" style="color:var(--text-muted); margin-bottom:8px;">Оборудование</div>
         <div class="chips" style="flex-wrap:wrap;">
           <button class="chip ${generatorOptions.equipment.includes('all') ? 'active' : ''}" data-action="genToggleEq" data-val="all">Всё</button>
@@ -518,6 +526,13 @@ function renderGeneratorDialog() {
           <button class="chip ${generatorOptions.equipment.includes('machine') ? 'active' : ''}" data-action="genToggleEq" data-val="machine">Тренажеры</button>
           <button class="chip ${generatorOptions.equipment.includes('cable') ? 'active' : ''}" data-action="genToggleEq" data-val="cable">Блоки</button>
           <button class="chip ${generatorOptions.equipment.includes('bodyweight') ? 'active' : ''}" data-action="genToggleEq" data-val="bodyweight">Свой вес</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:24px;">
+        <div class="progress-label" style="color:var(--text-muted); margin-bottom:8px;">Исключить группы</div>
+        <div class="chips" style="flex-wrap:wrap;">
+          ${groupChips}
         </div>
       </div>
 
@@ -739,16 +754,26 @@ function toggleEq(val) {
   render();
 }
 
+function toggleExcludeGroup(val) {
+  if (generatorOptions.excludedGroups.includes(val)) {
+    generatorOptions.excludedGroups = generatorOptions.excludedGroups.filter(g => g !== val);
+  } else {
+    generatorOptions.excludedGroups.push(val);
+  }
+  render();
+}
+
 function applyGeneratedPlan() {
   const newPlans = generatePlan({
     goal: generatorOptions.goal,
     exp: generatorOptions.exp,
     daysPerWeek: generatorOptions.days,
-    equipment: generatorOptions.equipment
+    equipment: generatorOptions.equipment,
+    excludedGroups: generatorOptions.excludedGroups
   });
 
   if (!newPlans) {
-    uiAlert('Недостаточно оборудования для генерации. Выберите больше вариантов.');
+    uiAlert('Недостаточно групп или оборудования. Выберите больше вариантов.');
     return;
   }
 
@@ -914,6 +939,7 @@ export const ACTIONS = {
   genSetExp: el => { generatorOptions.exp = el.dataset.val; render(); },
   genSetDays: el => { generatorOptions.days = Number(el.dataset.val); render(); },
   genToggleEq: el => toggleEq(el.dataset.val),
+  genToggleExclude: el => toggleExcludeGroup(el.dataset.val),
   exportCsv: () => exportCsv(),
   copyCsv: async () => {
     if (!csvModalData) return;
