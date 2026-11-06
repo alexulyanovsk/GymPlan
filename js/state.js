@@ -143,6 +143,7 @@ export function sanitizeState() {
   if (state.screen === 'dayEdit' && !state.editingDayId) state.screen = 'menu';
   if (state.rest && (typeof state.rest.endsAt !== 'number' || !Number.isFinite(state.rest.endsAt) || state.rest.endsAt < Date.now())) state.rest = null;
   if (typeof state.generatorOpen !== 'boolean') state.generatorOpen = false;
+  if (typeof state.libFilter !== 'string') state.libFilter = 'Все';
 
   invalidatePlanCaches();
   invalidateHistoryCaches();
@@ -178,9 +179,11 @@ export async function loadState() {
     if (typeof source.lastCompletedTs === 'number') state.lastCompletedTs = source.lastCompletedTs;
     if (typeof source._lastSavedTs === 'number') state._lastSavedTs = source._lastSavedTs;
     if (typeof source.generatorOpen === 'boolean') state.generatorOpen = source.generatorOpen;
+    if (typeof source.libFilter === 'string') state.libFilter = source.libFilter;
   }
 
   sanitizeState();
+
   try {
     const restStr = localStorage.getItem('gym_rest_v5');
     if (restStr) {
@@ -188,6 +191,11 @@ export async function loadState() {
       if (p && typeof p.endsAt === 'number' && p.endsAt > Date.now()) state.rest = p;
     }
   } catch(_) {}
+
+  // Если emergency-снимок содержал rest — восстановим
+  if (!state.rest && source && source.rest && typeof source.rest.endsAt === 'number' && source.rest.endsAt > Date.now()) {
+    state.rest = source.rest;
+  }
 }
 
 export async function flushNow() {
@@ -203,7 +211,8 @@ export async function flushNow() {
       weights: state.weights,
       lastCompletedTs: state.lastCompletedTs,
       _lastSavedTs: state._lastSavedTs,
-      generatorOpen: state.generatorOpen
+      generatorOpen: state.generatorOpen,
+      libFilter: state.libFilter     // ← сохраняем фильтр библиотеки
     }));
     await dbSet('full_state', stateToSave);
     try { localStorage.removeItem('gymplan_emergency'); } catch(_) {}
@@ -231,7 +240,8 @@ export async function exportData() {
     data = {
       plans: state.plans, screen: state.screen, currentDayId: state.currentDayId,
       workout: state.workout, history: state.history, weights: state.weights,
-      lastCompletedTs: state.lastCompletedTs, _lastSavedTs: Date.now()
+      lastCompletedTs: state.lastCompletedTs, _lastSavedTs: Date.now(),
+      libFilter: state.libFilter
     };
   }
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -260,9 +270,10 @@ export async function importData(file) {
         if (data.history !== undefined && !Array.isArray(data.history)) throw new Error('Некорректное поле history');
         if (data.weights !== undefined && (typeof data.weights !== 'object' || Array.isArray(data.weights))) throw new Error('Некорректное поле weights');
 
+        // Фиксированный ключ бэкапа — не копим записи
         try {
           const current = await dbGet('full_state');
-          if (current) await dbSet('full_state_backup_' + Date.now(), current);
+          if (current) await dbSet('full_state_backup', current);
         } catch(_) {}
 
         await dbSet('full_state', data);
