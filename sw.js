@@ -1,9 +1,9 @@
 /**
  * Файл: sw.js
- * Версия: 33.0.0 (Обновление кэша из-за правок в ui.js)
+ * Версия: 34.0.0 (Обновление кэша из-за правок в ui.js)
  */
 
-const CACHE_NAME = 'gymplan-v33';
+const CACHE_NAME = 'gymplan-v34';
 const APP_SHELL = [
   '/GymPlan/',
   '/GymPlan/index.html',
