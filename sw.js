@@ -1,16 +1,18 @@
 /**
  * Файл: sw.js
- * Версия: 40.0.0
- * Описание: install через cache.addAll (атомарно). Если хоть один файл не закэширован — SW не активируется.
+ * Версия: 41.0.0
+ * Описание: Обновлен кэш (v41), добавлены maskable-иконка и скриншот в APP_SHELL.
  */
 
-const CACHE_NAME = 'gymplan-v40';
+const CACHE_NAME = 'gymplan-v41';
 const APP_SHELL = [
   '/GymPlan/',
   '/GymPlan/index.html',
   '/GymPlan/styles.css',
   '/GymPlan/manifest.json',
   '/GymPlan/icon.svg',
+  '/GymPlan/icon-maskable.svg',
+  '/GymPlan/screenshot-1.png',
   '/GymPlan/js/boot.js',
   '/GymPlan/js/main.js',
   '/GymPlan/js/ui.js',
