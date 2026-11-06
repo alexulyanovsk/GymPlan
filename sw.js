@@ -1,4 +1,9 @@
-const CACHE_NAME = 'gymplan-v6';
+/**
+ * Файл: sw.js
+ * Версия: 7.0.0 (Добавлен generator.js, обновлен кэш)
+ */
+
+const CACHE_NAME = 'gymplan-v7';
 const APP_SHELL = [
   '/GymPlan/',
   '/GymPlan/index.html',
@@ -13,7 +18,7 @@ const APP_SHELL = [
   '/GymPlan/js/db.js',
   '/GymPlan/js/bridge.js',
   '/GymPlan/js/utils.js',
-  '/GymPlan/js/generator.js' // <--- ДОБАВЛЕНО
+  '/GymPlan/js/generator.js' // <--- ДОБАВЛЕН НОВЫЙ ФАЙЛ
 ];
 
 self.addEventListener('install', (e) => {
@@ -34,6 +39,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
+  // 1. Шрифты Google - Cache First
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(
       caches.match(e.request).then((cached) => {
@@ -48,6 +54,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // 2. Картинки с CDN — Cache First
   if (url.hostname === 'd3d2ynhodh9o1z.cloudfront.net') {
     e.respondWith(
       caches.match(e.request).then((cached) => {
@@ -62,6 +69,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // 3. Навигация (HTML) — Network First, fallback to Cache
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request)
@@ -75,6 +83,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // 4. Локальная статика (JS, CSS) — Stale-While-Revalidate
   if (url.pathname.startsWith('/GymPlan/') && (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'))) {
     e.respondWith(
       caches.match(e.request).then((cached) => {
