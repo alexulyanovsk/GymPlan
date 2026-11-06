@@ -13,7 +13,7 @@ export function invalidatePlanCaches() { inDaysCache.clear(); }
 export function invalidateHistoryCaches() { lastAttemptCache.clear(); }
 
 export function sanitizeState() {
-  if (!state.plans || typeof state.plans !== 'object' || Array.isArray(state.plans)) state.plans = JSON.parse(JSON.stringify(DEFAULT_STATE.plans));
+  if (!state.plans || typeof state.plans !== 'object' || Array.isArray(state.plans)) state.plans = {};
   for (const id of Object.keys(state.plans)) {
     const d = state.plans[id];
     if (!d || typeof d !== 'object' || typeof d.title !== 'string') { delete state.plans[id]; continue; }
@@ -73,6 +73,7 @@ export function sanitizeState() {
   }
   if (state.screen === 'dayEdit' && !state.editingDayId) state.screen = 'menu';
   if (state.rest && (typeof state.rest.endsAt !== 'number' || !isFinite(state.rest.endsAt) || state.rest.endsAt < Date.now())) state.rest = null;
+  if (typeof state.generatorOpen !== 'boolean') state.generatorOpen = false;
   invalidatePlanCaches();
   invalidateHistoryCaches();
 }
@@ -106,6 +107,7 @@ export async function loadState() {
     state.weights = source.weights || {};
     state.lastCompletedTs = source.lastCompletedTs || 0;
     state._lastSavedTs = source._lastSavedTs || 0;
+    if (typeof source.generatorOpen === 'boolean') state.generatorOpen = source.generatorOpen;
   }
 
   sanitizeState();
@@ -129,11 +131,11 @@ export async function flushNow() {
       history: state.history,
       weights: state.weights,
       lastCompletedTs: state.lastCompletedTs,
-      _lastSavedTs: state._lastSavedTs
+      _lastSavedTs: state._lastSavedTs,
+      generatorOpen: state.generatorOpen
     }));
     await dbSet('full_state', stateToSave);
     
-    // Очищаем аварийный слепок, так как успешно сохранились в БД
     localStorage.removeItem('gymplan_emergency');
 
     if (state.rest) localStorage.setItem('gym_rest_v5', JSON.stringify(state.rest));
