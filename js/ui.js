@@ -1,7 +1,7 @@
 /**
  * Файл: js/ui.js
- * Версия: 9.1.0
- * Описание: Гантель с маской userSpaceOnUse (без обрезки краев). Финальная версия.
+ * Версия: 9.1.1
+ * Описание: Обновлена иконка гантели на главной странице.
  */
 
 import { state, saveState, getCurrentEx, getLastAttempt, progressionHint, startValues, getInDays, exportData, importData, invalidatePlanCaches, invalidateHistoryCaches } from './state.js';
@@ -33,17 +33,21 @@ const ICON = {
   check: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
   sparkles: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>`,
   
-  // Иконка гантели с маской, привязанной к холсту
-  dumbbell: `<svg width="120" height="120" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-        <rect x="0" y="0" width="512" height="512" fill="white"/>
-        <circle cx="150" cy="256" r="20" fill="black"/>
-        <circle cx="362" cy="256" r="20" fill="black"/>
-      </mask>
-    </defs>
-    <g mask="url(#holeMask)">
-      <path d="M150 200v112m212-112v112M100 250h312" stroke="var(--accent)" stroke-width="40" stroke-linecap="round"/>
+  // НОВАЯ ИДЕАЛЬНАЯ ИКОНКА ГАНТЕЛИ
+  dumbbell: `<svg width="160" height="80" viewBox="0 0 100 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <mask id="gymplan-holes-mask">
+      <rect width="100" height="50" fill="white"/>
+      <circle cx="20" cy="25" r="4" fill="black"/>
+      <circle cx="80" cy="25" r="4" fill="black"/>
+    </mask>
+    <g mask="url(#gymplan-holes-mask)" fill="var(--accent)">
+      <rect x="14" y="10" width="12" height="30" rx="6"/>
+      <rect x="14" y="4" width="12" height="12" rx="6"/>
+      <rect x="14" y="34" width="12" height="12" rx="6"/>
+      <rect x="74" y="10" width="12" height="30" rx="6"/>
+      <rect x="74" y="4" width="12" height="12" rx="6"/>
+      <rect x="74" y="34" width="12" height="12" rx="6"/>
+      <rect x="22" y="22" width="56" height="6" rx="3"/>
     </g>
   </svg>`
 };
